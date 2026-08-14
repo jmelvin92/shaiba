@@ -173,6 +173,52 @@ use_collision = true
 size = Vector3(0.8, 3, 0.8)
 material = ExtResource("7_shadow")
 
+[node name="CrouchTunnel" type="Node3D" parent="."]
+
+[node name="WallLeft" type="CSGBox3D" parent="CrouchTunnel"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.2, 0.8, 11)
+use_collision = true
+size = Vector3(0.6, 1.6, 6)
+material = ExtResource("5_clay")
+
+[node name="WallRight" type="CSGBox3D" parent="CrouchTunnel"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.8, 0.8, 11)
+use_collision = true
+size = Vector3(0.6, 1.6, 6)
+material = ExtResource("5_clay")
+
+[node name="Lintel" type="CSGBox3D" parent="CrouchTunnel"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 1.45, 11)
+use_collision = true
+size = Vector3(4, 0.3, 6)
+material = ExtResource("4_plaster")
+
+[node name="Jumps" type="Node3D" parent="."]
+
+[node name="LedgeJumpable" type="CSGBox3D" parent="Jumps"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0.45, 18)
+use_collision = true
+size = Vector3(4, 0.9, 4)
+material = ExtResource("6_gold")
+
+[node name="LedgeTooTall" type="CSGBox3D" parent="Jumps"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.8, 18)
+use_collision = true
+size = Vector3(4, 1.6, 4)
+material = ExtResource("7_shadow")
+
+[node name="GapNear" type="CSGBox3D" parent="Jumps"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.45, 18)
+use_collision = true
+size = Vector3(5, 0.9, 5)
+material = ExtResource("4_plaster")
+
+[node name="GapFar" type="CSGBox3D" parent="Jumps"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.45, 27)
+use_collision = true
+size = Vector3(5, 0.9, 5)
+material = ExtResource("4_plaster")
+
 [node name="Obstacles" type="Node3D" parent="."]
 
 [node name="PillarA" type="CSGBox3D" parent="Obstacles"]

@@ -5,10 +5,12 @@
 [ext_resource type="Material" path="res://resources/palette/accent_gold.tres" id="3_facing"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+resource_local_to_scene = true
 radius = 0.35
 height = 1.75
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
+resource_local_to_scene = true
 material = ExtResource("2_body")
 radius = 0.35
 height = 1.75

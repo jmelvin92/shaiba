@@ -30,6 +30,29 @@ extends CharacterBody3D
 ## gives a sudden reversal its weight; the visible turn alone would not.
 @export_range(0.0, 1.0, 0.05) var turn_drag: float = 0.55
 
+@export_group("Air")
+## Peak height of a full jump, metres. Converted to a launch velocity against
+## whatever gravity is in force, so tuning gravity doesn't change the hop.
+@export_range(0.0, 4.0, 0.05) var jump_height: float = 1.1
+## How much of the rise is kept when the jump key is released early. 1 = no
+## variable height, 0.4 = a tap gets you noticeably less than a hold.
+@export_range(0.0, 1.0, 0.05) var jump_release_damping: float = 0.45
+## Grace period after walking off a ledge during which a jump still counts.
+@export_range(0.0, 0.4, 0.01) var coyote_time: float = 0.12
+## How early a jump press is remembered if you hit it just before landing.
+@export_range(0.0, 0.4, 0.01) var jump_buffer_time: float = 0.12
+## Share of ground acceleration and friction that applies mid-air. Low values
+## mean a jump commits you to roughly the arc you launched with.
+@export_range(0.0, 1.0, 0.05) var air_control: float = 0.35
+
+@export_group("Crouch")
+## Pace while crouched.
+@export_range(0.5, 6.0, 0.1) var crouch_speed: float = 2.0
+## Capsule height when crouched. Standing height is read from the scene.
+@export_range(0.6, 2.0, 0.05) var crouch_height: float = 1.15
+## How quickly the capsule shrinks and grows again.
+@export_range(1.0, 40.0, 0.5) var crouch_transition_speed: float = 14.0
+
 @export_group("Ground")
 ## Tallest ledge the player can walk up without jumping. Kept below
 ## floor_snap_length at runtime — the snap is what puts the body back down.
@@ -44,11 +67,29 @@ extends CharacterBody3D
 ## means "away from the camera".
 var view_yaw: float = 0.0
 
+@onready var _collision: CollisionShape3D = $Collision
+@onready var _body: MeshInstance3D = $Body
+@onready var _facing_marker: MeshInstance3D = $FacingMarker
+@onready var _capsule: CapsuleShape3D = _collision.shape
+@onready var _capsule_mesh: CapsuleMesh = _body.mesh
+
+## Full standing capsule height, taken from the scene at load.
+var _stand_height: float = 1.75
+## Where the capsule is between crouched and standing right now, in metres.
+var _current_height: float = 1.75
+var _crouched: bool = false
+## Counts down after leaving the floor; a jump is still allowed while positive.
+var _coyote_left: float = 0.0
+## Counts down after a jump press; spends itself the moment a jump is possible.
+var _jump_buffer_left: float = 0.0
+
 
 func _ready() -> void:
 	# The floor snap is what lowers the body again after a step-up probe, so it
 	# has to reach at least as far as the tallest step we allow.
 	floor_snap_length = maxf(floor_snap_length, max_step_height + 0.05)
+	_stand_height = _capsule.height
+	_current_height = _stand_height
 
 
 ## Called by the level that owns both this player and the camera rig.
@@ -67,21 +108,97 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity += get_gravity() * gravity_scale * delta
 
-	var target_speed: float = run_speed if Input.is_action_pressed("sprint") else walk_speed
+	_update_crouch(delta)
+	_update_jump(delta)
+
+	# Mid-air you get only a share of your usual grip, so a jump largely
+	# commits you to the arc you left the ground with.
+	var control: float = 1.0 if is_on_floor() else air_control
 	var planar: Vector3 = Vector3(velocity.x, 0.0, velocity.z)
 	if direction.length_squared() > 0.0:
-		planar = planar.move_toward(
-			direction * target_speed, acceleration * _turn_thrust(direction) * delta
-		)
+		var thrust: float = acceleration * _turn_thrust(direction) * control
+		planar = planar.move_toward(direction * _target_speed(), thrust * delta)
 		_face_direction(direction, delta)
 	else:
-		planar = planar.move_toward(Vector3.ZERO, friction * delta)
+		planar = planar.move_toward(Vector3.ZERO, friction * control * delta)
 	velocity.x = planar.x
 	velocity.z = planar.z
 
 	if is_on_floor():
 		_try_step_up(planar)
 	move_and_slide()
+
+
+## The pace being asked for: crouching beats sprinting, sprinting beats walking.
+func _target_speed() -> float:
+	if _crouched:
+		return crouch_speed
+	if Input.is_action_pressed("sprint"):
+		return run_speed
+	return walk_speed
+
+
+## True while crouched, for anyone driving animation off this controller.
+func is_crouching() -> bool:
+	return _crouched
+
+
+## Follows the crouch key, except that you cannot stand up under something.
+## The capsule resizes toward the target height rather than snapping, and the
+## collision shape and mesh are kept sitting on the character's feet.
+func _update_crouch(delta: float) -> void:
+	if Input.is_action_pressed("crouch"):
+		_crouched = true
+	elif _crouched and _has_standing_room():
+		_crouched = false
+
+	var wanted: float = crouch_height if _crouched else _stand_height
+	if is_equal_approx(_current_height, wanted):
+		return
+	_current_height = move_toward(
+		_current_height, wanted, crouch_transition_speed * delta
+	)
+	_apply_height(_current_height)
+
+
+## Sweeps the crouched capsule up through the space standing would occupy.
+func _has_standing_room() -> bool:
+	var needed: float = _stand_height - _current_height
+	if needed <= 0.0:
+		return true
+	return not test_move(global_transform, Vector3.UP * needed)
+
+
+func _apply_height(height: float) -> void:
+	_capsule.height = height
+	_capsule_mesh.height = height
+	_collision.position.y = height * 0.5
+	_body.position.y = height * 0.5
+	# Keep the facing marker at the same fraction of the body's height.
+	_facing_marker.position.y = height * 0.771
+
+
+## Jump with the two forgivenesses players never notice until they are missing:
+## a moment of coyote time after leaving a ledge, and a buffered press so
+## hitting the key just before landing still fires.
+func _update_jump(delta: float) -> void:
+	if is_on_floor():
+		_coyote_left = coyote_time
+	else:
+		_coyote_left = maxf(_coyote_left - delta, 0.0)
+
+	if Input.is_action_just_pressed("jump"):
+		_jump_buffer_left = jump_buffer_time
+	else:
+		_jump_buffer_left = maxf(_jump_buffer_left - delta, 0.0)
+
+	if _jump_buffer_left > 0.0 and _coyote_left > 0.0 and not _crouched:
+		velocity.y = sqrt(2.0 * get_gravity().length() * gravity_scale * jump_height)
+		_jump_buffer_left = 0.0
+		_coyote_left = 0.0
+	elif Input.is_action_just_released("jump") and velocity.y > 0.0:
+		# Released mid-rise — cut it short once, so a tap is a smaller hop.
+		velocity.y *= jump_release_damping
 
 
 ## Fraction of full acceleration available right now, based on how far the body

@@ -50,7 +50,7 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 **Deliverables**
 - `project.godot` (Godot 4.7.1, Forward+, project name "Shaiba"), window/stretch settings sensible for desktop.
 - Folder structure created exactly as in `docs/ARCHITECTURE.md` (feature folders under `scenes/`, `autoload/`, `resources/`, `shaders/`, `assets/`).
-- Input map defined in project settings: `move_up/down/left/right` (WASD + arrows), `interact` (E) — even if unused yet. *(Phase 2 added `sprint` (shift) and `camera_zoom_in/out` (wheel).)*
+- Input map defined in project settings: `move_up/down/left/right` (WASD + arrows), `interact` (E) — even if unused yet. *(Phase 2 added `sprint` (shift), `jump` (space), `crouch` (ctrl or C) and `camera_zoom_in/out` (wheel).)*
 - Palette as a Godot resource: `resources/palette/` with named `StandardMaterial3D` .tres files for every color in ART_DIRECTION.md (flat-shaded: roughness 1.0, no metallic).
 - One autoload only for now: `autoload/game.gd` (`Game`) — holds world seed + will grow into pause/state later. No premature managers.
 - `scenes/world/world.tscn` main scene: DirectionalLight3D (warm, angled like late afternoon), WorldEnvironment with the sky/ambient colors from ART_DIRECTION.md, and a temporary 50×50 m flat ground plane using the sand material.
@@ -70,9 +70,9 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 
 **Deliverables**
 - `scenes/player/player.tscn`: `CharacterBody3D` + capsule placeholder mesh (palette material), `player.gd` with typed GDScript.
-- Movement: 8-directional WASD relative to camera, acceleration/deceleration curves (no instant start/stop), gentle rotation of the body toward move direction, `move_and_slide` on floor, gravity for slopes/ledges. Export-var tuned: max speed, accel, friction, turn speed.
+- Movement: 8-directional WASD relative to camera, acceleration/deceleration curves (no instant start/stop), gentle rotation of the body toward move direction, `move_and_slide` on floor, gravity for slopes/ledges. Export-var tuned: max speed, accel, friction, turn speed. *(Grew during playtest into a full moveset: walk/run/crouch gaits and a jump — see the notes below.)*
 - `scenes/camera/camera_rig.tscn`: separate rig scene — a `Node3D` that smoothly follows the player (lag/damping), holding the angled top-down `Camera3D` per the fixed decision. Zoom in/out on scroll wheel between sensible clamps.
-- Test scene `scenes/world/graybox.tscn` with ramps, steps, and obstacles to validate slopes and collisions (kept permanently as a movement test level).
+- Test scene `scenes/world/graybox.tscn` with ramps, steps, and obstacles to validate slopes and collisions (kept permanently as a movement test level). *(Also gained, alongside the abilities added after the first playtest: a crouch tunnel, jumpable and too-tall ledges, and a run-only gap.)*
 - Tuning documented: final values and *why they feel right* in DECISIONS.md.
 
 **Quality Gate**
@@ -83,7 +83,9 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 - [x] PLAN.md updated; merged to `development`.
 
 **Notes for later phases**
-- Tuning had one playtest pass with Joshua (2026-08-13): he asked for more weight on launches and sudden turns, and a further-out default camera. Result: acceleration 16, friction 24, turn_speed 7, new `turn_drag` 0.55, camera default 23 m (zoom 9–34). Every value is an `@export` on `player.tscn` / `camera_rig.tscn`; reasoning and before/after measurements are in DECISIONS.md.
+- Tuning had one playtest pass with Joshua (2026-08-13): he asked for more weight on launches and sudden turns, and a further-out default camera. Result: acceleration 16, friction 24, turn_speed 7, new `turn_drag` 0.55, camera default 23 m (zoom 9–34).
+- The moveset then grew, also at Joshua's request: **run** (hold shift, 7.4 m/s), **jump** (space, 1.1 m, with coyote time / input buffer / variable height / reduced air control) and **crouch** (ctrl or C, 1.15 m capsule, 2.0 m/s, can't stand under a ceiling). Every value is an `@export` on `player.tscn` / `camera_rig.tscn`; reasoning and measurements are in DECISIONS.md.
+- **Knock-on for Phase 3:** the animation set is no longer just idle/walk/run — jump/fall/land and crouch poses are needed too. Phase 3's deliverables have been updated.
 - Camera obstruction ducks the camera all the way in, so standing against something very tall (the graybox's 6 m wall) fills the screen with the player. Unavoidable at a 52° pitch — the fix is fading occluders, which belongs with Phase 6/7 when there are real tall props to fade. DECISIONS.md has the geometry.
 - `graybox.tscn` is a permanent test level; keep it working as movement changes.
 
@@ -93,7 +95,7 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 
 **Deliverables**
 - Low-poly desert traveler modeled in Blender (via blender-mcp): head-wrap/keffiyeh, loose robes — palette colors only, target ≤ 2,500 tris. Source: `assets/blender/player.blend`; export: `assets/models/player.glb`.
-- Simple rig + three animations minimum: `idle`, `walk`, `run`. Root motion NOT used — animation speed matched to movement speed in code.
+- Simple rig + animations. `idle`, `walk`, `run` are the core three; Phase 2 also shipped jump and crouch, so this phase additionally needs **`jump`/`fall`/`land`** (or at least a credible airborne pose) and **`crouch_idle`/`crouch_walk`**. Root motion NOT used — animation speed matched to movement speed in code.
 - `AnimationTree` with a state machine (idle↔walk↔run blended by speed) driven from `player.gd`. **The input side already exists from Phase 2**: holding shift (`sprint`) raises the target speed from `walk_speed` 4.6 to `run_speed` 7.4, so blend off the player's planar speed — not off the input — and the blend stays correct while winding up, on slopes, and mid-turn.
 - Export pipeline documented in `docs/ART_DIRECTION.md` (Blender export settings, scale/orientation conventions, checklist) so every later asset follows the identical process.
 
