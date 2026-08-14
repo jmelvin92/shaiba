@@ -217,8 +217,9 @@ func _collision_audit() -> void:
 	if worst_field > 0.08:
 		_fail("collision: %.4f m off the analytic field (curvature bound blown)" % worst_field)
 
-	level.queue_free()
-	await physics_frame
+	# Synchronous free: queue_free's deletion pass wouldn't run before quit,
+	# which shows up as "ObjectDB instances leaked at exit".
+	level.free()
 
 
 ## Walks the player 2 km in a straight line through streaming terrain and
@@ -332,8 +333,9 @@ func _walk(args: PackedStringArray) -> void:
 			% max_rise
 		)
 
-	level.queue_free()
-	await physics_frame
+	# Synchronous free: queue_free's deletion pass wouldn't run before quit,
+	# which shows up as "ObjectDB instances leaked at exit".
+	level.free()
 
 
 ## Verifies the deep-sand movement hooks against the real desert: walking
@@ -410,8 +412,9 @@ func _sand() -> void:
 	if absf(sink - wanted) > 0.02:
 		_fail("sand sink: mesh sits at %.3f m, expected %.3f m" % [sink, wanted])
 
-	level.queue_free()
-	await physics_frame
+	# Synchronous free: queue_free's deletion pass wouldn't run before quit,
+	# which shows up as "ObjectDB instances leaked at exit".
+	level.free()
 
 
 ## Scans a ring around the spawn for positions whose depth satisfies
