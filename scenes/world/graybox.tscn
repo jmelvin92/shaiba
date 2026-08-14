@@ -26,30 +26,35 @@ material = ExtResource("3_sand")
 [node name="Ramp15" type="CSGBox3D" parent="Ramps"]
 transform = Transform3D(1, 0, 0, 0, 0.965926, -0.258819, 0, 0.258819, 0.965926, -20, 0.310832, -9.863703)
 use_collision = true
+collision_layer = 5
 size = Vector3(5, 1.5, 8)
 material = ExtResource("4_plaster")
 
 [node name="Ramp25" type="CSGBox3D" parent="Ramps"]
 transform = Transform3D(1, 0, 0, 0, 0.906308, -0.422618, 0, 0.422618, 0.906308, -10, 1.010742, -9.625231)
 use_collision = true
+collision_layer = 5
 size = Vector3(5, 1.5, 8)
 material = ExtResource("4_plaster")
 
 [node name="Ramp30" type="CSGBox3D" parent="Ramps"]
 transform = Transform3D(1, 0, 0, 0, 0.866025, -0.5, 0, 0.5, 0.866025, 0, 1.350481, -9.464102)
 use_collision = true
+collision_layer = 5
 size = Vector3(5, 1.5, 8)
 material = ExtResource("4_plaster")
 
 [node name="Ramp40" type="CSGBox3D" parent="Ramps"]
 transform = Transform3D(1, 0, 0, 0, 0.766044, -0.642788, 0, 0.642788, 0.766044, 10, 1.996617, -9.064178)
 use_collision = true
+collision_layer = 5
 size = Vector3(5, 1.5, 8)
 material = ExtResource("7_shadow")
 
 [node name="Ramp50" type="CSGBox3D" parent="Ramps"]
 transform = Transform3D(1, 0, 0, 0, 0.642788, -0.766044, 0, 0.766044, 0.642788, 20, 2.582087, -8.571150)
 use_collision = true
+collision_layer = 5
 size = Vector3(5, 1.5, 8)
 material = ExtResource("7_shadow")
 
@@ -58,48 +63,56 @@ material = ExtResource("7_shadow")
 [node name="Step1" type="CSGBox3D" parent="Stairs"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.125, -6.35)
 use_collision = true
+collision_layer = 5
 size = Vector3(5, 0.25, 0.7)
 material = ExtResource("5_clay")
 
 [node name="Step2" type="CSGBox3D" parent="Stairs"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.25, -7.05)
 use_collision = true
+collision_layer = 5
 size = Vector3(5, 0.5, 0.7)
 material = ExtResource("5_clay")
 
 [node name="Step3" type="CSGBox3D" parent="Stairs"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.375, -7.75)
 use_collision = true
+collision_layer = 5
 size = Vector3(5, 0.75, 0.7)
 material = ExtResource("5_clay")
 
 [node name="Step4" type="CSGBox3D" parent="Stairs"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.5, -8.45)
 use_collision = true
+collision_layer = 5
 size = Vector3(5, 1, 0.7)
 material = ExtResource("5_clay")
 
 [node name="Step5" type="CSGBox3D" parent="Stairs"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.625, -9.15)
 use_collision = true
+collision_layer = 5
 size = Vector3(5, 1.25, 0.7)
 material = ExtResource("5_clay")
 
 [node name="Step6" type="CSGBox3D" parent="Stairs"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.75, -9.85)
 use_collision = true
+collision_layer = 5
 size = Vector3(5, 1.5, 0.7)
 material = ExtResource("5_clay")
 
 [node name="Step7" type="CSGBox3D" parent="Stairs"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.875, -10.55)
 use_collision = true
+collision_layer = 5
 size = Vector3(5, 1.75, 0.7)
 material = ExtResource("5_clay")
 
 [node name="Landing" type="CSGBox3D" parent="Stairs"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.875, -12.9)
 use_collision = true
+collision_layer = 5
 size = Vector3(5, 1.75, 4)
 material = ExtResource("5_clay")
 
@@ -108,18 +121,21 @@ material = ExtResource("5_clay")
 [node name="Curb020" type="CSGBox3D" parent="Curbs"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 0.1, -2)
 use_collision = true
+collision_layer = 5
 size = Vector3(4, 0.2, 1.5)
 material = ExtResource("6_gold")
 
 [node name="Curb035" type="CSGBox3D" parent="Curbs"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 0.175, -6)
 use_collision = true
+collision_layer = 5
 size = Vector3(4, 0.35, 1.5)
 material = ExtResource("6_gold")
 
 [node name="Curb050" type="CSGBox3D" parent="Curbs"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 0.25, -10)
 use_collision = true
+collision_layer = 5
 size = Vector3(4, 0.5, 1.5)
 material = ExtResource("6_gold")
 
@@ -128,48 +144,56 @@ material = ExtResource("6_gold")
 [node name="TallWall" type="CSGBox3D" parent="CameraTests"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 10)
 use_collision = true
+collision_layer = 5
 size = Vector3(16, 6, 0.8)
 material = ExtResource("7_shadow")
 
 [node name="CorridorWallLeft" type="CSGBox3D" parent="CameraTests"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 1.5, 4)
 use_collision = true
+collision_layer = 5
 size = Vector3(0.8, 3, 12)
 material = ExtResource("5_clay")
 
 [node name="CorridorWallRight" type="CSGBox3D" parent="CameraTests"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 1.5, 4)
 use_collision = true
+collision_layer = 5
 size = Vector3(0.8, 3, 12)
 material = ExtResource("5_clay")
 
 [node name="OverhangRoof" type="CSGBox3D" parent="CameraTests"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18, 3.25, 6)
 use_collision = true
+collision_layer = 5
 size = Vector3(10, 0.5, 8)
 material = ExtResource("4_plaster")
 
 [node name="OverhangPillarA" type="CSGBox3D" parent="CameraTests"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22.5, 1.5, 2.5)
 use_collision = true
+collision_layer = 5
 size = Vector3(0.8, 3, 0.8)
 material = ExtResource("7_shadow")
 
 [node name="OverhangPillarB" type="CSGBox3D" parent="CameraTests"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.5, 1.5, 2.5)
 use_collision = true
+collision_layer = 5
 size = Vector3(0.8, 3, 0.8)
 material = ExtResource("7_shadow")
 
 [node name="OverhangPillarC" type="CSGBox3D" parent="CameraTests"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22.5, 1.5, 9.5)
 use_collision = true
+collision_layer = 5
 size = Vector3(0.8, 3, 0.8)
 material = ExtResource("7_shadow")
 
 [node name="OverhangPillarD" type="CSGBox3D" parent="CameraTests"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.5, 1.5, 9.5)
 use_collision = true
+collision_layer = 5
 size = Vector3(0.8, 3, 0.8)
 material = ExtResource("7_shadow")
 
@@ -178,18 +202,21 @@ material = ExtResource("7_shadow")
 [node name="WallLeft" type="CSGBox3D" parent="CrouchTunnel"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.2, 0.8, 11)
 use_collision = true
+collision_layer = 5
 size = Vector3(0.6, 1.6, 6)
 material = ExtResource("5_clay")
 
 [node name="WallRight" type="CSGBox3D" parent="CrouchTunnel"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.8, 0.8, 11)
 use_collision = true
+collision_layer = 5
 size = Vector3(0.6, 1.6, 6)
 material = ExtResource("5_clay")
 
 [node name="Lintel" type="CSGBox3D" parent="CrouchTunnel"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 1.45, 11)
 use_collision = true
+collision_layer = 5
 size = Vector3(4, 0.3, 6)
 material = ExtResource("4_plaster")
 
@@ -198,24 +225,28 @@ material = ExtResource("4_plaster")
 [node name="LedgeJumpable" type="CSGBox3D" parent="Jumps"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0.45, 18)
 use_collision = true
+collision_layer = 5
 size = Vector3(4, 0.9, 4)
 material = ExtResource("6_gold")
 
 [node name="LedgeTooTall" type="CSGBox3D" parent="Jumps"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.8, 18)
 use_collision = true
+collision_layer = 5
 size = Vector3(4, 1.6, 4)
 material = ExtResource("7_shadow")
 
 [node name="GapNear" type="CSGBox3D" parent="Jumps"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.45, 18)
 use_collision = true
+collision_layer = 5
 size = Vector3(5, 0.9, 5)
 material = ExtResource("4_plaster")
 
 [node name="GapFar" type="CSGBox3D" parent="Jumps"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.45, 27)
 use_collision = true
+collision_layer = 5
 size = Vector3(5, 0.9, 5)
 material = ExtResource("4_plaster")
 
@@ -224,24 +255,28 @@ material = ExtResource("4_plaster")
 [node name="PillarA" type="CSGBox3D" parent="Obstacles"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.25, -2)
 use_collision = true
+collision_layer = 5
 size = Vector3(1.2, 2.5, 1.2)
 material = ExtResource("7_shadow")
 
 [node name="PillarB" type="CSGBox3D" parent="Obstacles"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1.25, 2)
 use_collision = true
+collision_layer = 5
 size = Vector3(1.2, 2.5, 1.2)
 material = ExtResource("7_shadow")
 
 [node name="PillarC" type="CSGBox3D" parent="Obstacles"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 1.25, -16)
 use_collision = true
+collision_layer = 5
 size = Vector3(1.2, 2.5, 1.2)
 material = ExtResource("7_shadow")
 
 [node name="PillarD" type="CSGBox3D" parent="Obstacles"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 1.25, -18)
 use_collision = true
+collision_layer = 5
 size = Vector3(1.2, 2.5, 1.2)
 material = ExtResource("7_shadow")
 

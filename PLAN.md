@@ -78,7 +78,7 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 **Quality Gate**
 - [x] Moving in all 8 directions feels responsive but weighty; no jitter, no foot-sliding of the capsule, no camera stutter (test at 60 fps+). *(Scripted run: all 8 directions reach exactly 4.60 m/s with diagonals normalised; full speed in ~0.18 s, stop in 0.15 s; zero drift while idle. At 120 fps the player's screen position held within 0.03 px of a straight line over 180 frames while walking.)*
 - [x] Slopes up to ~30° walkable, steeper blocked; no getting stuck on step edges in graybox.tscn. *(15/25/30° ramps climbed to full height; 40/50° refused. 0.25 m staircase walks up onto the landing; 0.20 m and 0.35 m curbs climb, 0.50 m refused.)*
-- [x] Camera never clips geometry in the graybox scene; zoom clamps work. *(Camera ducks to 1.86 m at the 6 m wall and in the yawed corridor, 1.96 m under the overhang, stays at 18 m in the open; zoom clamps hold at 9.00 and 28.00. Screenshot-checked at each spot — see the note below on cramped framing in the extreme cases.)*
+- [x] Camera never clips geometry in the graybox scene; zoom clamps work. *(Solved by fading occluders rather than moving the camera — the camera holds 23 m at the 6 m wall, under the overhang and in the crouch tunnel, and the blocking object fades to 22% while the ground stays fully opaque. Screenshot-checked at each spot. Zoom clamps hold at 9.00 and 34.00.)*
 - [x] All scripts typed GDScript, zero warnings. *(`--import`, per-script `--check-only`, and headless runs of both level scenes: no errors or warnings.)*
 - [x] PLAN.md updated; merged to `development`.
 
@@ -86,7 +86,7 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 - Tuning had one playtest pass with Joshua (2026-08-13): he asked for more weight on launches and sudden turns, and a further-out default camera. Result: acceleration 16, friction 24, turn_speed 7, new `turn_drag` 0.55, camera default 23 m (zoom 9–34).
 - The moveset then grew, also at Joshua's request: **run** (hold shift, 7.4 m/s), **jump** (space, 1.1 m, with coyote time / input buffer / variable height / reduced air control) and **crouch** (ctrl or C, 1.15 m capsule, 2.0 m/s, can't stand under a ceiling). Every value is an `@export` on `player.tscn` / `camera_rig.tscn`; reasoning and measurements are in DECISIONS.md.
 - **Knock-on for Phase 3:** the animation set is no longer just idle/walk/run — jump/fall/land and crouch poses are needed too. Phase 3's deliverables have been updated.
-- Camera obstruction ducks the camera all the way in, so standing against something very tall (the graybox's 6 m wall) fills the screen with the player. Unavoidable at a 52° pitch — the fix is fading occluders, which belongs with Phase 6/7 when there are real tall props to fade. DECISIONS.md has the geometry.
+- Camera obstruction is handled by fading, not by camera movement — the camera's distance is now purely the player's zoom. **Every new prop from Phase 6 on needs `collision_layer = 5`** (world + occluder) to be fadeable; terrain must stay on layer 1 alone so it never fades.
 - `graybox.tscn` is a permanent test level; keep it working as movement changes.
 
 ## Phase 3 — Character model & animation
