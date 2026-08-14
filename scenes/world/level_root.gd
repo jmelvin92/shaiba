@@ -15,6 +15,10 @@ extends Node3D
 ## terrain (the graybox) leave the node out and everything below is skipped —
 ## the player's sand hooks then stay inert.
 @export var chunk_manager_path: NodePath = ^"ChunkManager"
+## Direct child accumulating footprint deformation, if this level has one.
+## Levels without it (the graybox) leave the node out; the terrain shader's
+## deformation uniforms then stay at their inert defaults.
+@export var sand_deformation_path: NodePath = ^"SandDeformation"
 
 
 func _ready() -> void:
@@ -45,3 +49,8 @@ func _ready() -> void:
 	player.global_position.y = terrain.get_surface_height(spawn_xz) + 0.1
 	player.reset_physics_interpolation()
 	camera_rig.snap_to_target()
+
+	var sand: SandDeformation = get_node_or_null(sand_deformation_path) as SandDeformation
+	if sand != null:
+		sand.set_terrain(terrain)
+		sand.set_tracked(player)
