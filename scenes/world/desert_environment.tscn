@@ -13,6 +13,11 @@ sky_material = SubResource("ProceduralSkyMaterial_sky")
 background_mode = 2
 sky = SubResource("Sky_sky")
 tonemap_mode = 2
+fog_enabled = true
+fog_light_color = Color(1, 0.937255, 0.839216, 1)
+fog_density = 0.004
+fog_aerial_perspective = 0.5
+fog_sky_affect = 0.0
 
 [node name="DesertEnvironment" type="Node3D"]
 

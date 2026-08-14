@@ -16,6 +16,8 @@ script = ExtResource("1_level")
 [node name="ChunkManager" type="Node3D" parent="."]
 script = ExtResource("3_chunks")
 settings = ExtResource("4_desert")
+load_radius = 5
+unload_radius = 6
 
 [node name="DebugOverlay" parent="ChunkManager" instance=ExtResource("5_overlay")]
 

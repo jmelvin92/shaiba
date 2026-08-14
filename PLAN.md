@@ -35,7 +35,7 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 ## Fixed decisions (do not re-litigate in later sessions)
 
 - **Engine:** Godot 4.7.1, Forward+ renderer. Repo root **is** the Godot project root.
-- **Camera:** angled top-down / near-isometric — perspective camera, pitched ≈ 45° down (lowered from 52° for a more cinematic read, see DECISIONS.md), slight FOV (~35°) for a "toy diorama" feel. Rotatable in 45° steps later if wanted; never free-look.
+- **Camera:** angled perspective camera, narrow FOV (~35°) for the "toy diorama" feel, pitched **19°** down since Phase 4 — low enough that dune backs and a sliver of hazy horizon sit in the upper frame (Joshua compared a 45–16° ladder and picked 19; history: 52° → 45° → 19°, see DECISIONS.md). Keeps a small vertical clearance above terrain; rotatable in 45° steps later if wanted; never free-look.
 - **Art:** low-poly flat-shaded, palette-only materials (see `docs/ART_DIRECTION.md`). Blender sources in `assets/blender/`, exported `.glb` in `assets/models/`.
 - **World:** chunked terrain streamed around the player (see `docs/ARCHITECTURE.md`). Deterministic generation from a world seed.
 - **Code:** GDScript (typed), feature-folder organization, conventions in CLAUDE.md. No C# unless a profiled performance need forces it (record it in `docs/DECISIONS.md` if so).
@@ -128,7 +128,7 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 - Chunk size and radius chosen by profiling (64 m chunks, 5×5 loaded / unload at 7×7), generation off the main thread, installs time-budgeted so streaming never hitches.
 - Dunes: wind-stretched dune waves + drift patchiness + ripples that fade where sand is thin; flat-shaded via derivative normals in `shaders/sand_terrain.gdshader`; vertex-color sand-tone gradient with patchy dither; vertex alpha carries normalised sand depth for Phase 5's print-depth cap.
 - **Deep sand affects movement**: speed multiplier, softened jump, visible foot-sink — all keyed off `get_sand_depth`, all inert off-terrain (graybox unchanged).
-- Far-field: **none needed** — at max zoom the streaming edge is mathematically never on screen (see DECISIONS.md); verified by screenshot.
+- Far-field: **warm distance haze + load radius 5** — the far dunes melt into the horizon before the streaming edge, which stays invisible (screenshot-verified). At the original 45° camera nothing at all was needed; the 19° pick changed that (see DECISIONS.md).
 - Debug overlay (toggle with F3): current chunk coords, loaded/building counts, streaming cost, frame time, memory.
 - Player + camera dropped into the real desert as the new main scene flow, spawn-seated on the surface after a synchronous first build.
 - `tools/verify_terrain.gd`: determinism/seams/slope/depth audits, collision-vs-mesh raycast audit, 2 km streaming walk, deep-sand movement checks.

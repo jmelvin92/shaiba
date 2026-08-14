@@ -40,6 +40,7 @@ func _ready() -> void:
 	if terrain == null:
 		return
 	player.set_terrain(terrain)
+	camera_rig.set_terrain(terrain)
 	var spawn_xz: Vector2 = Vector2(player.global_position.x, player.global_position.z)
 	player.global_position.y = terrain.get_surface_height(spawn_xz) + 0.1
 	player.reset_physics_interpolation()

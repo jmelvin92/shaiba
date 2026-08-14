@@ -1,9 +1,10 @@
 class_name CameraRig
 extends Node3D
-## Angled top-down ("diorama") camera rig.
+## Angled "diorama" camera rig.
 ##
-## Perspective camera, pitched ~45° down with a narrow FOV — see the fixed
-## decision in docs/DECISIONS.md. The rig follows a target position with
+## Perspective camera with a narrow FOV, pitched 19° down since Joshua's
+## Phase 4 pick — low enough that dune backs and a sliver of hazy horizon
+## sit in the upper frame — see docs/DECISIONS.md. The rig follows a target position with
 ## damping and zooms on the scroll wheel between clamps. It deliberately does
 ## NOT move to avoid geometry: anything blocking the view is faded instead, by
 ## the OccluderFader child. See docs/DECISIONS.md.
@@ -26,12 +27,24 @@ signal yaw_changed(yaw: float)
 @export var follow_offset: Vector3 = Vector3(0.0, 1.0, 0.0)
 
 @export_group("Framing")
-## Downward pitch in degrees, from horizontal.
-@export_range(20.0, 80.0, 0.5) var pitch_degrees: float = 45.0:
+## Downward pitch in degrees, from horizontal. Below ~15° dunes would hide
+## the player constantly (terrain never fades); above ~26° the narrow lens
+## shows no background at all.
+@export_range(10.0, 80.0, 0.5) var pitch_degrees: float = 19.0:
 	set = set_pitch_degrees
 ## Rotation of the rig around the world Y axis, degrees.
 @export_range(0.0, 360.0, 45.0) var yaw_degrees: float = 0.0:
 	set = set_yaw_degrees
+
+@export_group("Terrain")
+## Minimum height the camera keeps above the sand, metres. At a 19° pitch the
+## camera rides low enough that a tall dune behind the player could otherwise
+## swallow it. This is a vertical clamp from the terrain's analytic height —
+## not the "camera dodges geometry" behaviour docs/DECISIONS.md rejects: the
+## framing never pulls in, it only lifts.
+@export_range(0.0, 5.0, 0.1) var terrain_clearance: float = 1.2
+## Damping of the lift as it engages and releases.
+@export_range(1.0, 30.0, 0.5) var lift_speed: float = 8.0
 
 @export_group("Zoom")
 ## Starting distance from the framed point, metres.
@@ -55,6 +68,13 @@ var _target: Node3D = null
 var _zoom_goal: float = 23.0
 ## Smoothed follower of [member _zoom_goal]; also the camera's actual distance.
 var _zoom_current: float = 23.0
+## Terrain query source for the clearance clamp; null on levels without one.
+var _terrain: TerrainSettings = null
+## The follow position before any terrain lift, tracked separately so the
+## lift can never feed back into the follow damping.
+var _follow_position: Vector3 = Vector3.ZERO
+## Smoothed extra height currently applied to clear the sand.
+var _lift: float = 0.0
 
 
 func _ready() -> void:
@@ -72,13 +92,21 @@ func set_target(target: Node3D) -> void:
 	snap_to_target()
 
 
+## Called by a level that has terrain, so the camera can stay out of the sand.
+func set_terrain(terrain: TerrainSettings) -> void:
+	_terrain = terrain
+
+
 ## Jumps the rig to its target without any easing — use after teleports.
 func snap_to_target() -> void:
 	if _target == null:
 		return
-	global_position = _target.global_position + follow_offset
+	_follow_position = _target.global_position + follow_offset
+	global_position = _follow_position
 	if _camera != null:
 		_camera.position.z = _zoom_current
+	_lift = _needed_lift()
+	global_position.y += _lift
 	reset_physics_interpolation()
 
 
@@ -105,9 +133,23 @@ func _physics_process(delta: float) -> void:
 	if _target == null:
 		return
 	var goal: Vector3 = _target.global_position + follow_offset
-	global_position = global_position.lerp(goal, 1.0 - exp(-follow_speed * delta))
+	_follow_position = _follow_position.lerp(goal, 1.0 - exp(-follow_speed * delta))
+	global_position = _follow_position
 	_zoom_current = lerpf(_zoom_current, _zoom_goal, 1.0 - exp(-zoom_speed * delta))
 	_camera.position.z = _zoom_current
+	_lift = lerpf(_lift, _needed_lift(), 1.0 - exp(-lift_speed * delta))
+	global_position.y += _lift
+
+
+## How far the camera must rise right now to keep its clearance over the sand.
+## Evaluated from the terrain's analytic height at the camera's own footprint,
+## with the rig sitting at the unlifted follow position.
+func _needed_lift() -> float:
+	if _terrain == null or _camera == null:
+		return 0.0
+	var cam: Vector3 = _camera.global_position
+	var floor_y: float = _terrain.get_surface_height(Vector2(cam.x, cam.z))
+	return maxf(floor_y + terrain_clearance - cam.y, 0.0)
 
 
 func _unhandled_input(event: InputEvent) -> void:

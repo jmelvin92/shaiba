@@ -245,8 +245,9 @@ func _walk(args: PackedStringArray) -> void:
 	var player: Player = level.find_child("Player", true, false) as Player
 	var manager: ChunkManager = level.find_child("ChunkManager", true, false) as ChunkManager
 
-	# Let the spawn build and the first frames settle before measuring.
-	for _i: int in range(120):
+	# Let the spawn build, the first frames, and (windowed) the window-focus
+	# transition all settle before measuring.
+	for _i: int in range(300):
 		await physics_frame
 
 	var progress_path: String = "user://walk_progress.txt"
@@ -254,6 +255,8 @@ func _walk(args: PackedStringArray) -> void:
 	var start_memory: float = Performance.get_monitor(Performance.MEMORY_STATIC)
 	var worst_frame_ms: float = 0.0
 	var over_budget: int = 0
+	var dropped: int = 0
+	var drops: PackedStringArray = []
 	var frames: int = 0
 	var max_loaded: int = 0
 	var end_loaded: int = 0
@@ -275,6 +278,15 @@ func _walk(args: PackedStringArray) -> void:
 			worst_frame_ms = frame_ms
 		if frame_ms > 4.0:
 			over_budget += 1
+		if frame_ms > 16.8:
+			dropped += 1
+			# Attribution: was streaming actually doing anything this frame?
+			if drops.size() < 40:
+				drops.append(
+					"t %.1f s: frame %.1f ms, apply %.2f ms, pending %d"
+					% [float(Time.get_ticks_usec() - wall_start) / 1e6,
+						frame_ms, manager.last_apply_ms, manager.get_pending_count()]
+				)
 
 		var grounded: bool = player.is_on_floor()
 		var y: float = player.global_position.y
@@ -306,14 +318,18 @@ func _walk(args: PackedStringArray) -> void:
 	var full_grid: int = (2 * manager.load_radius + 1) * (2 * manager.load_radius + 1)
 	var max_grid: int = (2 * manager.unload_radius + 1) * (2 * manager.unload_radius + 1)
 	print(
-		"walk: %d frames over %.0f m; whole frame worst %.2f ms, %d > 4 ms (%.2f%%); "
+		"walk: %d frames over %.0f m; whole frame worst %.2f ms, %d > 4 ms (%.2f%%), "
 		% [frames, absf(player.global_position.z - start_z), worst_frame_ms, over_budget,
 			100.0 * over_budget / maxf(frames, 1.0)]
-		+ "streaming apply worst %.2f ms; loaded now %d (max %d), memory %+.1f MB, "
-		% [manager.worst_apply_ms, end_loaded, max_loaded, memory_delta_mb]
-		+ "max grounded rise %.3f m/tick"
-		% [max_rise]
+		+ "%d dropped (> 16.8 ms); streaming apply worst %.2f ms; "
+		% [dropped, manager.worst_apply_ms]
+		+ "loaded now %d (max %d), memory %+.1f MB, max grounded rise %.3f m/tick"
+		% [end_loaded, max_loaded, memory_delta_mb, max_rise]
 	)
+	for line: String in drops:
+		print("  drop " + line)
+	if realtime and dropped > frames / 1000:
+		_fail("walk: %d frames dropped below 60 fps over the run" % dropped)
 	if manager.worst_apply_ms > 4.0:
 		_fail(
 			"walk: installing chunks took %.2f ms in one frame (budget is 4 ms)"
