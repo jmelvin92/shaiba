@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scenes/world/terrain/terrain_chunk.gd" id="1_chunk"]
+[ext_resource type="Material" path="res://resources/terrain/sand_terrain_material.tres" id="2_material"]
+
+[node name="TerrainChunk" type="StaticBody3D"]
+collision_layer = 1
+collision_mask = 0
+script = ExtResource("1_chunk")
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+material_override = ExtResource("2_material")
+
+[node name="Collision" type="CollisionShape3D" parent="."]

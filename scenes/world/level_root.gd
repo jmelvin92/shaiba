@@ -11,6 +11,10 @@ extends Node3D
 @export var player_path: NodePath = ^"Player"
 ## Direct child holding the gameplay camera.
 @export var camera_rig_path: NodePath = ^"CameraRig"
+## Direct child streaming the terrain, if this level has one. Levels without
+## terrain (the graybox) leave the node out and everything below is skipped —
+## the player's sand hooks then stay inert.
+@export var chunk_manager_path: NodePath = ^"ChunkManager"
 
 
 func _ready() -> void:
@@ -23,3 +27,21 @@ func _ready() -> void:
 	camera_rig.yaw_changed.connect(player.set_view_yaw)
 	player.set_view_yaw(camera_rig.get_yaw())
 	camera_rig.set_target(player)
+
+	var chunk_manager: ChunkManager = get_node_or_null(chunk_manager_path) as ChunkManager
+	if chunk_manager == null:
+		return
+
+	# set_tracked builds the spawn chunks before returning, so the ground's
+	# collision exists before the first physics tick; only then is the player
+	# seated on the actual surface (which may sit metres above y = 0).
+	chunk_manager.set_tracked(player)
+	var terrain: TerrainSettings = chunk_manager.get_terrain()
+	if terrain == null:
+		return
+	player.set_terrain(terrain)
+	camera_rig.set_terrain(terrain)
+	var spawn_xz: Vector2 = Vector2(player.global_position.x, player.global_position.z)
+	player.global_position.y = terrain.get_surface_height(spawn_xz) + 0.1
+	player.reset_physics_interpolation()
+	camera_rig.snap_to_target()

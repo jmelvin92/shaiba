@@ -14,7 +14,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 1 | Godot project scaffold & core architecture | `feature/phase-1-scaffold` | ✅ Done (2026-08-13) |
 | 2 | Camera & movement (gray-box) | `feature/phase-2-camera-movement` | ✅ Done (2026-08-13) |
 | 3 | Character model & animation | `feature/phase-3-character` | ✅ Done (2026-08-13) |
-| 4 | Terrain & chunk streaming | `feature/phase-4-terrain` | 🔲 Not started |
+| 4 | Terrain & chunk streaming | `feature/phase-4-terrain` | ✅ Done (2026-08-13) |
 | 5 | Sand footprint physics | `feature/phase-5-footprints` | 🔲 Not started |
 | 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🔲 Not started |
 | 7 | Integration & polish → v0.1 | `feature/phase-7-polish` | 🔲 Not started |
@@ -35,7 +35,7 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 ## Fixed decisions (do not re-litigate in later sessions)
 
 - **Engine:** Godot 4.7.1, Forward+ renderer. Repo root **is** the Godot project root.
-- **Camera:** angled top-down / near-isometric — perspective camera, pitched ≈ 45° down (lowered from 52° for a more cinematic read, see DECISIONS.md), slight FOV (~35°) for a "toy diorama" feel. Rotatable in 45° steps later if wanted; never free-look.
+- **Camera:** angled perspective camera, narrow FOV (~35°) for the "toy diorama" feel, pitched **19°** down since Phase 4 — low enough that dune backs and a sliver of hazy horizon sit in the upper frame (Joshua compared a 45–16° ladder and picked 19; history: 52° → 45° → 19°, see DECISIONS.md). Keeps a small vertical clearance above terrain; rotatable in 45° steps later if wanted; never free-look.
 - **Art:** low-poly flat-shaded, palette-only materials (see `docs/ART_DIRECTION.md`). Blender sources in `assets/blender/`, exported `.glb` in `assets/models/`.
 - **World:** chunked terrain streamed around the player (see `docs/ARCHITECTURE.md`). Deterministic generation from a world seed.
 - **Code:** GDScript (typed), feature-folder organization, conventions in CLAUDE.md. No C# unless a profiled performance need forces it (record it in `docs/DECISIONS.md` if so).
@@ -120,35 +120,54 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 
 **Goal:** the open desert. Chunked, streamed, seeded — the permanent world foundation, built right the first time.
 
+**Scope expanded at session start (Joshua):** the sand itself is a core system — variable *depth* across the map (deep drifts, thin skins over hard ground), and depth is felt in movement, not just seen. Footprint memory and wind stay in Phase 5, but the terrain is architected for them now.
+
 **Deliverables**
-- `scenes/world/terrain/` chunk system per `docs/ARCHITECTURE.md`: `chunk_manager.gd` (loads/unloads a radius of chunks around the player), `terrain_chunk.gd` (builds one chunk's mesh + collision from the world-seeded `FastNoiseLite` dune heightfield).
-- Chunk size and radius chosen by profiling (start 64 m chunks, ~5×5 loaded), generation off the main thread (`WorkerThreadPool` or thread) so streaming never hitches.
-- Dunes: layered noise for large dune waves + small ripple detail; flat-shaded sand material; subtle vertex-color variation between the two sand tones for visual interest.
-- Far-field: simple distant-ring lower-LOD chunks or a horizon skirt so the horizon is never a hard edge (pick simplest approach that looks right; record in DECISIONS.md).
-- Debug overlay (toggle with F3): current chunk coords, loaded chunk count, frame time.
-- Player + camera dropped into the real desert as the new main scene flow.
+- `scenes/world/terrain/` chunk system per `docs/ARCHITECTURE.md`: `chunk_manager.gd` (loads/unloads a radius of chunks around the player, builds threaded via `WorkerThreadPool`), `terrain_chunk.gd` (one chunk's mesh + `HeightMapShape3D` collision from the world-seeded noise fields).
+- **Two-layer sand model** in `resources/terrain/terrain_settings.gd` + `desert.tres`: hard substrate + variable-thickness sand layer (the dunes *are* the sand), with analytic queries `get_surface_height` / `get_base_height` / `get_sand_depth` that work anywhere, loaded or not.
+- Chunk size and radius chosen by profiling (64 m chunks, 5×5 loaded / unload at 7×7), generation off the main thread, installs time-budgeted so streaming never hitches.
+- Dunes: wind-stretched dune waves + drift patchiness + ripples that fade where sand is thin; flat-shaded via derivative normals in `shaders/sand_terrain.gdshader`; vertex-color sand-tone gradient with patchy dither; vertex alpha carries normalised sand depth for Phase 5's print-depth cap.
+- **Deep sand affects movement**: speed multiplier, softened jump, visible foot-sink — all keyed off `get_sand_depth`, all inert off-terrain (graybox unchanged).
+- Far-field: **warm distance haze + load radius 5** — the far dunes melt into the horizon before the streaming edge, which stays invisible (screenshot-verified). At the original 45° camera nothing at all was needed; the 19° pick changed that (see DECISIONS.md).
+- Debug overlay (toggle with F3): current chunk coords, loaded/building counts, streaming cost, frame time, memory.
+- Player + camera dropped into the real desert as the new main scene flow, spawn-seated on the surface after a synchronous first build.
+- `tools/verify_terrain.gd`: determinism/seams/slope/depth audits, collision-vs-mesh raycast audit, 2 km streaming walk, deep-sand movement checks.
 
 **Quality Gate**
-- [ ] Walk continuously in one direction for 2+ km of world distance: no hitches > 4 ms from streaming, no visible pop-in gaps or seams between chunks, memory stable (chunks actually unload).
-- [ ] Same seed ⇒ identical terrain across runs; different seed ⇒ different desert.
-- [ ] Collision matches visuals — player never floats or sinks on any dune.
-- [ ] 60 fps+ on this Mac at default window size with full load radius.
-- [ ] PLAN.md updated; merged to `development`.
+- [x] Walk continuously in one direction for 2+ km of world distance: no hitches > 4 ms from streaming, no visible pop-in gaps or seams between chunks, memory stable (chunks actually unload). *(`verify_terrain --walk`, headless and windowed at the final radius 5: worst chunk-install cost 1.27 ms in any frame; chunk count plateaus at 132 within the 13×13 unload ring; memory +0.9 MB over the full 2 km; step-up never fired on terrain. Seams impossible by construction — shared edges bit-identical, asserted every run.)*
+- [x] Same seed ⇒ identical terrain across runs; different seed ⇒ different desert. *(Byte-identical double-build with a printable world hash; different seed produces a different hash.)*
+- [x] Collision matches visuals — player never floats or sinks on any dune. *(2,000-ray audit: raycasts land on the rendered mesh to 0.0000 m — HeightMapShape3D and the mesh share the same cell diagonal — and within 5 cm of the analytic field, the documented curvature bound.)*
+- [x] 60 fps+ on this Mac at default window size with full load radius. *(~185 fps average over the windowed 2 km walk; 67 of 76,396 frames exceeded 16.8 ms, every one with streaming idle and attributed to macOS window-server activity, including the documented occluded-window stall.)*
+- [x] PLAN.md updated; merged to `development`.
 
-## Phase 5 — Sand footprint physics
+**Notes for later phases**
+- **The camera changed mid-phase, at Joshua's request:** pitch 45° → **19°** (his pick from a seven-rung screenshot ladder), which brought load radius 5, the warm distance haze, and a terrain-clearance lift on the rig — see DECISIONS.md. **Joshua has not yet played** the 19° camera, the deep-sand movement feel, or the Phase 3 final tuning — the first minutes of Phase 5 (or a quick session before it) should be a playtest.
+- The Phase 3 pale-character-on-pale-sand worry mostly resolved itself at 19°: the figure now reads against midground amber dunes rather than pale ground. Judge finally in the Phase 7 pass.
+- Watch in playtest: whether dune crests hiding the player at 19° (rare by design) actually bothers, and whether the camera's Y-follow bobs on dune slopes at run speed (the flagged fix is a separate vertical follow damping on CameraRig).
+- Phase 5 hooks shipped and verified: `COLOR.a` = normalised sand depth per vertex, `get_sand_depth` everywhere, `jumped`/`landed(impact_speed)` signals, deformation extends `sand_terrain.gdshader` in place.
+- Phase 6 props: remember `collision_layer = 5` (fadeable) — terrain stays layer 1 alone. Prop scattering should key off `get_sand_depth` (palms want shallow sand near hard ground, not dune bodies).
+- The sand ripples read as soft mottle rather than crisp ripples at the gameplay camera; acceptable now, revisit when Phase 5's prints add surface detail.
 
-**Goal:** the signature feature — the player leaves footprints and trails in the sand that persist believably and fade over time.
+## Phase 5 — Sand footprint physics (expanded with the sand-memory vision)
 
-**Planned approach** (validate before building, record final in DECISIONS.md): a "sand deformation" texture accumulated in a `SubViewport` that follows the player — footstep brushes stamped as the character walks — sampled by the near-terrain shader for vertex displacement (depression) + a slightly darker/compacted sand color in the print. Deformation region covers only nearby chunks; texture slowly decays so old prints fill in like wind-blown sand. Distant chunks skip it entirely.
+**Goal:** the signature feature — the sand *remembers*. The player (and later anything else) leaves footprints and trails that persist believably, are deeper where the sand is deeper, and are slowly erased as wind refills them.
+
+**Memory model — "long but local" (decided with Joshua in the Phase 4 planning session):** a large deformation region around the player remembers prints for several minutes; walk a long way off and distant prints quietly reset. Prints are *not* per-chunk persistent world state — that was considered and deferred (cost/complexity vs. payoff; revisit if the trail-behind-you ever needs to survive a kilometre round trip).
+
+**Planned approach** (validate with a prototype first, record final in DECISIONS.md): a "sand deformation" texture accumulated in a `SubViewport` whose region follows the player in snapped increments — footstep brushes stamped as the character walks — sampled by `shaders/sand_terrain.gdshader` (extended with deformation uniforms, not swapped) for vertex depression + a darker compacted tint toward `sand_shadow`. Texture slowly decays = wind refilling prints. Distant chunks keep zero-strength uniforms and cost nothing.
+
+**Phase 4 already shipped the hooks:** vertex `COLOR.a` carries normalised sand depth, so the shader caps print depth by the sand that is actually there (shallow sand ⇒ faint prints, hard ground ⇒ none); `get_sand_depth` says how deep any stamp may go; `player.gd` emits `jumped`/`landed(impact_speed)` and its toe bones are already tracked by verify tooling; the movement/sink feel of deep sand is done.
 
 **Deliverables**
-- `shaders/sand_deform.gdshader` + the SubViewport stamping rig, integrated with the Phase 4 chunk terrain.
-- Footstep stamps timed to the walk/run animation (alternating left/right), plus a soft drag trail when moving.
-- Decay: prints visibly soften and vanish over ~1–2 minutes (tunable export var).
+- The SubViewport stamping rig + deformation uniforms in `sand_terrain.gdshader`, integrated with the chunk terrain.
+- Footstep stamps timed to the walk/run animation (alternating left/right), scaled by local sand depth; a soft drag trail when moving; a deeper landing stamp off `landed(impact_speed)`.
+- Decay: prints visibly soften and vanish over minutes (tunable export var), reading as wind-blown refill.
+- **Wind as a first idea, not a system:** decay direction/rate may lean with the terrain's `wind_yaw_degrees` so prints fade the way the dunes lie; a real wind-blows-sand-up system is future work, but nothing here may block it.
 - Hooks for the future: any object (camel, dragged items) can register as a "sand stamper" — small, clean interface.
 
 **Quality Gate**
 - [ ] Footprints visually match foot placement at walk and run; look correct from the gameplay camera in both direct light and shadow.
+- [ ] Print depth visibly varies with sand depth: a trail crossing deep drift → thin skin → hard ground reads deep → faint → gone.
 - [ ] No shimmer/artifacts at the deformation region boundary as it follows the player across chunk borders.
 - [ ] Frame cost of the whole system ≤ 1 ms on this Mac; zero cost when standing still.
 - [ ] Prints fade smoothly; walking a circle and returning shows believable partial fading.
