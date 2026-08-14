@@ -1,0 +1,17 @@
+# Godot
+.godot/
+*.translation
+export_presets.cfg
+export/
+
+# Blender backups/temp
+*.blend1
+*.blend2
+*.blend@
+
+# macOS
+.DS_Store
+
+# Misc
+*.tmp
+*.log
