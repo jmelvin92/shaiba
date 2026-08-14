@@ -29,14 +29,20 @@ Joshua asked for main to stay protected until testing passes; --no-ff keeps each
 
 ## Phase 2 — camera & movement
 
-**2026-08-13 — Movement tuning: max_speed 4.6 m/s, acceleration 26 m/s², friction 32 m/s², turn_speed 11.**
-Measured on the graybox: full speed arrives in ~0.18 s (66% of it inside the first 0.1 s) and a released key stops the player in 0.15 s. That is a ramp you can feel — no instant snap, no ice-skating — while staying responsive enough that dodging a rock never feels late. 4.6 m/s is a brisk walk for a 1.75 m character, leaving headroom for a run speed in Phase 3. Turn smoothing of 11 gives a ~0.3 s about-face, so direction changes read as the body turning rather than teleporting. **These are Claude's numbers, not yet confirmed by feel — Joshua should play the graybox and say if it wants more weight or less.**
+**2026-08-13 — Movement tuning, first pass: max_speed 4.6 m/s, acceleration 26 m/s², friction 32 m/s², turn_speed 11.**
+Measured on the graybox: full speed in ~0.18 s, stop in 0.15 s. 4.6 m/s is a brisk walk for a 1.75 m character, leaving headroom for a run speed in Phase 3. Superseded below after Joshua played it.
+
+**2026-08-13 — Movement tuning, after playtest: acceleration 16, friction 24, turn_speed 7, and a new `turn_drag` of 0.55. Speed unchanged at 4.6 m/s.**
+Joshua's note was "more weight, especially during sudden turns or launches." Lowering acceleration covers launches, but lowering `turn_speed` alone would only have slowed the *visible* rotation — velocity still changed direction the instant you pressed a key, so a reversal would look heavier without feeling it. `turn_drag` fixes that by scaling available acceleration with how well the body already faces where you asked to go: aligned gives full thrust, a full about-face gives `1 - turn_drag`, recovering as the body comes round. Measured after: launch to 90% of top speed 0.27 s (was 0.16), stop 0.20 s, a 180° reversal takes 0.40 s before you move back at all, and a right-angle turn dips to 71% of top speed so corners cost something. Slope, curb and staircase behaviour re-verified unchanged.
 
 **2026-08-13 — `floor_max_angle` 32°, so slopes up to ~30° are walkable and steeper ones are not.**
 PLAN's gate asks for ~30° walkable / steeper blocked. Setting the threshold slightly above 30 means the 30° test ramp is comfortably walkable rather than marginal, while the 40° and 50° ramps are firmly refused. Verified on all five graybox ramps.
 
 **2026-08-13 — Step climbing by lifting the body *before* `move_and_slide`, not teleporting it onto the ledge after.**
 The usual up→forward→down probe has to move the body forward by roughly the capsule radius to clear the obstacle's face, which pops it visibly. Instead, when a wall-like surface is within `step_probe_distance` (0.5 m) ahead and there is headroom, the body is raised by `max_step_height` and `move_and_slide`'s floor snap puts it back down in the same tick — onto the ledge once the body has cleared its face, otherwise straight back where it was. Nothing is visible until the step is actually taken. Consequence: `floor_snap_length` must exceed `max_step_height`, so `_ready` clamps it. Verified: 0.20 m and 0.35 m curbs climb, 0.50 m is refused, a 0.25 m staircase walks up cleanly. Walkable slopes are excluded from the probe so they keep their natural along-the-slope speed.
+
+**2026-08-13 — Default camera distance 23 m (was 18), zoom range 9–34 m.**
+Joshua wanted the camera further out by default. 23 m puts the character at roughly 12% of screen height — small enough to read the terrain around them, which suits an open desert, and the clamps were widened so there is still real travel in both directions from the new default.
 
 **2026-08-13 — Camera obstruction: own `ShapeCast3D` rather than `SpringArm3D`.**
 SpringArm3D does the same cast but snaps the camera in *and* out instantly, and offers no control over the result. Rolling our own is ~15 lines and buys eased return (ducking in stays immediate — nothing should ever pop through the lens — while easing back out over ~0.3 s), a tunable floor, and a `get_camera_distance()` worth testing against.

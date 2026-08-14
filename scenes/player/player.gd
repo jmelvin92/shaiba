@@ -14,11 +14,16 @@ extends CharacterBody3D
 ## Top planar speed, metres per second. Walking pace for a 1.75 m character.
 @export_range(1.0, 12.0, 0.1) var max_speed: float = 4.6
 ## How hard the player is pushed toward max_speed (m/s²). Lower = more weight.
-@export_range(1.0, 100.0, 0.5) var acceleration: float = 26.0
+@export_range(1.0, 100.0, 0.5) var acceleration: float = 16.0
 ## How hard the player is slowed when there is no input (m/s²).
-@export_range(1.0, 100.0, 0.5) var friction: float = 32.0
+@export_range(1.0, 100.0, 0.5) var friction: float = 24.0
 ## Turn smoothing toward the move direction (higher = snappier, less drift).
-@export_range(1.0, 40.0, 0.5) var turn_speed: float = 11.0
+@export_range(1.0, 40.0, 0.5) var turn_speed: float = 7.0
+## How much of the acceleration is lost while the body is still turned away
+## from where you asked it to go. 0 = none (you change direction as fast as you
+## can press), 1 = no thrust at all until the body has come round. This is what
+## gives a sudden reversal its weight; the visible turn alone would not.
+@export_range(0.0, 1.0, 0.05) var turn_drag: float = 0.55
 
 @export_group("Ground")
 ## Tallest ledge the player can walk up without jumping. Kept below
@@ -59,7 +64,9 @@ func _physics_process(delta: float) -> void:
 
 	var planar: Vector3 = Vector3(velocity.x, 0.0, velocity.z)
 	if direction.length_squared() > 0.0:
-		planar = planar.move_toward(direction * max_speed, acceleration * delta)
+		planar = planar.move_toward(
+			direction * max_speed, acceleration * _turn_thrust(direction) * delta
+		)
 		_face_direction(direction, delta)
 	else:
 		planar = planar.move_toward(Vector3.ZERO, friction * delta)
@@ -69,6 +76,17 @@ func _physics_process(delta: float) -> void:
 	if is_on_floor():
 		_try_step_up(planar)
 	move_and_slide()
+
+
+## Fraction of full acceleration available right now, based on how far the body
+## still has to turn. Facing the way you asked gives 1.0; a full about-face
+## gives `1 - turn_drag`, recovering as the body comes round.
+func _turn_thrust(direction: Vector3) -> float:
+	if is_zero_approx(turn_drag):
+		return 1.0
+	var facing: Vector3 = -global_basis.z
+	var alignment: float = maxf(facing.dot(direction), 0.0)
+	return lerpf(1.0, alignment, turn_drag)
 
 
 ## Rotates the body toward [param direction] over time instead of snapping,

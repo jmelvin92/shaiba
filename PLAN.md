@@ -83,7 +83,7 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 - [x] PLAN.md updated; merged to `development`.
 
 **Notes for later phases**
-- Tuning values are Claude's, verified by measurement but **not yet by feel** — Joshua should walk the graybox (`scenes/world/graybox.tscn`, F6) and say whether movement wants more weight, and whether the default 18 m camera distance sits right. Every value is an `@export` on `player.tscn` / `camera_rig.tscn`; reasoning is in DECISIONS.md.
+- Tuning had one playtest pass with Joshua (2026-08-13): he asked for more weight on launches and sudden turns, and a further-out default camera. Result: acceleration 16, friction 24, turn_speed 7, new `turn_drag` 0.55, camera default 23 m (zoom 9–34). Every value is an `@export` on `player.tscn` / `camera_rig.tscn`; reasoning and before/after measurements are in DECISIONS.md.
 - Camera obstruction ducks the camera all the way in, so standing against something very tall (the graybox's 6 m wall) fills the screen with the player. Unavoidable at a 52° pitch — the fix is fading occluders, which belongs with Phase 6/7 when there are real tall props to fade. DECISIONS.md has the geometry.
 - `graybox.tscn` is a permanent test level; keep it working as movement changes.
 
