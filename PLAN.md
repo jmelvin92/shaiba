@@ -13,7 +13,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 0 | Plan, repo & conventions | `main` | ✅ Done (2026-08-13) |
 | 1 | Godot project scaffold & core architecture | `feature/phase-1-scaffold` | ✅ Done (2026-08-13) |
 | 2 | Camera & movement (gray-box) | `feature/phase-2-camera-movement` | ✅ Done (2026-08-13) |
-| 3 | Character model & animation | `feature/phase-3-character` | 🧪 In testing on `development` (awaiting Joshua's playtest) |
+| 3 | Character model & animation | `feature/phase-3-character` | ✅ Done (2026-08-13) |
 | 4 | Terrain & chunk streaming | `feature/phase-4-terrain` | 🔲 Not started |
 | 5 | Sand footprint physics | `feature/phase-5-footprints` | 🔲 Not started |
 | 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🔲 Not started |
@@ -107,11 +107,14 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 - [x] Runs in graybox scene with zero errors; PLAN.md updated; merged to `development`. *(Headless runs of `player.tscn`, `graybox.tscn` and `world.tscn` are clean, as are `--import` and per-script `--check-only`.)*
 
 **Notes for later phases**
-- **Movement speeds changed** (walk 4.6 → 1.4, run 7.4 → 4.9, crouch 2.0 → 1.0) to match the animations' own strides — Joshua's call. Phase 4's terrain scale and Phase 7's tuning should assume the slower pace. The graybox run-only gap shrank 4.0 → 2.8 m to stay crossable.
-- **Not yet playtested by Joshua.** The pace is a real change in feel and is the one thing this phase could not verify by script.
-- **Crouched movement holds a pose** — the source set has no forward crouch walk (see DECISIONS.md). A few more Meshy clips (forward crouch walk, a dedicated fall and landing) would close it.
-- **Camera distance is untouched at 23 m.** It was chosen for a player moving three times faster; worth comparing against ~16 m at playtest.
+- **Movement speeds changed** to match the animations' own strides — Joshua's call. Final values after his playtest: `walk_speed` 4.6 → **1.8**, `run_speed` 7.4 → **4.9**, `crouch_speed` 2.0 → **1.0**, `acceleration` 16 → **12**, `friction` 24 → **14**, `turn_drag` 0.55 → **0.45**. Phase 4's terrain scale and Phase 7's tuning should assume this slower pace. The graybox run-only gap shrank 4.0 → 2.8 m to stay crossable at the shorter jump.
+- **Playtested by Joshua**, who raised two things, both fixed and re-measured: stairs were not smooth (a real bug — the body was launched airborne on every tread; see DECISIONS.md) and movement felt too heavy (the 180° reversal had regressed to 0.53 s against the 0.40 s he approved in Phase 2; now 0.38 s). The final tuning was verified by measurement but he has not re-played it since.
+- **`tools/verify_player.gd` is this phase's gate as a runnable script** — foot sliding, animation states, stair smoothness, level fixtures and response times. Run it after any movement change; see `docs/ARCHITECTURE.md` for the modes.
+- **Crouched movement holds a pose** — the source set has no forward crouch walk (see DECISIONS.md). A few more Meshy clips (forward crouch walk, a dedicated fall and landing) would close it, and Joshua is generating a camel in Meshy for Phase 6 anyway.
+- **Camera distance is untouched at 23 m.** It was chosen for a player moving nearly three times faster; still worth comparing against ~16 m.
+- **The character is low-contrast against sand** — pale cream on pale ground. Phase 4's dune tones and shadows are the real test of whether it needs addressing.
 - Phase 5's footstep stamping has its hook: `player.gd` emits `landed(impact_speed)` and `jumped`, and the toe bones (`LeftToeBase`/`RightToeBase`) are what `verify_player.gd` already tracks for foot contact.
+- **Phase 4 watch-item:** `_try_step_up` runs every grounded tick and probes ahead. It deliberately ignores anything walkable (surfaces within `floor_max_angle`), so smooth dunes should never trigger it — but confirm that on real terrain, because a chunk seam presenting a near-vertical sliver would look like a step.
 
 ## Phase 4 — Terrain & chunk streaming
 

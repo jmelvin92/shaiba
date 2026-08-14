@@ -37,9 +37,32 @@ resources/
 shaders/                     # sand_deform.gdshader etc.
 assets/
   blender/                   # .blend sources — the editable truth for every model
+                             # (carries a .gdignore: Godot must not import sources)
   models/                    # exported .glb — what Godot imports
   textures/                  # rare; palette style needs almost none
+tools/                       # build and measurement scripts — not shipped, not
+                             # part of any scene, safe to run at any time
+  build_player.py            # Blender: Meshy source .glb -> player.blend + player.glb
+  measure_gaits.gd           # each locomotion clip's natural stride speed
+  verify_player.gd           # quality-gate probe (see below)
+  shoot_player.gd            # screenshots each pose at the gameplay camera
+  dump_scene.gd              # prints an imported scene's node tree and animations
 ```
+
+**`tools/verify_player.gd` is the Phase 3 gate as an executable.** Run headless;
+each mode answers one question that an eye cannot judge reliably:
+
+| mode | question |
+|---|---|
+| *(none)* | does a planted foot stay put, and does every animation state arrive? |
+| `--feel` | how long to reach speed, stop, and reverse? |
+| `--stairs` | how far does the collider move in a tick, and how far does the *mesh*? |
+| `--graybox` | do the level fixtures still behave at the current speeds? |
+| `--sweep` | what body speed matches a clip's stride? |
+
+Keep these working as movement changes — they are how a "feels wrong" report
+gets turned into a number, and twice now the number has pointed somewhere other
+than the obvious culprit.
 
 ## World / chunk system (built in Phase 4, designed now)
 
