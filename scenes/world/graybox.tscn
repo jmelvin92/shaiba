@@ -244,7 +244,7 @@ size = Vector3(5, 0.9, 5)
 material = ExtResource("4_plaster")
 
 [node name="GapFar" type="CSGBox3D" parent="Jumps"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.45, 27)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.45, 25.8)
 use_collision = true
 collision_layer = 5
 size = Vector3(5, 0.9, 5)

@@ -39,6 +39,16 @@ const REQUIRED: PackedStringArray = [
 @export_range(0.0, 8.0, 0.1) var land_impact_threshold: float = 4.0
 
 var _state: AnimationNodeStateMachinePlayback
+## The state we last asked for. [method AnimationNodeStateMachinePlayback.travel]
+## only takes effect when the tree next processes, so asking the playback what
+## is current would still report the previous state and we would immediately
+## override our own request.
+var _wanted: StringName = GROUND
+## Seconds left of a one-shot (a jump or a landing) that owns the machine until
+## it has played out.
+var _hold: float = 0.0
+var _jump_length: float = 0.0
+var _land_length: float = 0.0
 
 
 func _ready() -> void:
@@ -50,6 +60,9 @@ func _ready() -> void:
 		if not player.has_animation(clip):
 			push_error("PlayerAnimator: player.glb is missing the '%s' clip." % clip)
 			return
+
+	_jump_length = player.get_animation(JUMP).length
+	_land_length = player.get_animation(LAND).length
 
 	_state = get("parameters/playback") as AnimationNodeStateMachinePlayback
 	# Only start mixing once the machine has somewhere to be, otherwise the
@@ -63,32 +76,45 @@ func set_locomotion(planar_speed: float, grounded: bool, crouching: bool) -> voi
 	if _state == null:
 		return
 
-	if not grounded:
-		if _state.get_current_node() != JUMP:
-			_travel_to(FALL)
-		return
-
-	var wanted: StringName = CROUCHED if crouching else GROUND
-	# A landing plays itself out; don't cut it short by travelling every tick.
-	if _state.get_current_node() != LAND:
-		_travel_to(wanted)
-
 	if crouching:
 		set("parameters/%s/blend_position" % CROUCHED, clampf(planar_speed, 0.0, CROUCH_SPEED))
 	else:
 		set("parameters/%s/blend_position" % GROUND, clampf(planar_speed, 0.0, RUN_SPEED))
 
+	_hold = maxf(_hold - 1.0 / float(Engine.physics_ticks_per_second), 0.0)
+	if _hold > 0.0:
+		# A jump or a landing is mid-flight; let it finish rather than talking
+		# over it every tick.
+		return
+
+	if not grounded:
+		_travel_to(FALL)
+	else:
+		_travel_to(CROUCHED if crouching else GROUND)
+
+
+## Name of the state playing right now, for probes and debug overlays.
+func get_state() -> StringName:
+	return _state.get_current_node() if _state != null else &""
+
 
 ## The controller launched a jump this tick.
 func play_jump() -> void:
 	_travel_to(JUMP)
+	_hold = _jump_length
 
 
 ## The controller touched down this tick, arriving at [param impact_speed] m/s.
 func play_land(impact_speed: float) -> void:
-	_travel_to(LAND if impact_speed >= land_impact_threshold else GROUND)
+	if impact_speed < land_impact_threshold:
+		# Stepping off a curb shouldn't buckle the knees.
+		return
+	_travel_to(LAND)
+	_hold = _land_length
 
 
 func _travel_to(state: StringName) -> void:
-	if _state != null and _state.get_current_node() != state:
-		_state.travel(state)
+	if _state == null or _wanted == state:
+		return
+	_wanted = state
+	_state.travel(state)
