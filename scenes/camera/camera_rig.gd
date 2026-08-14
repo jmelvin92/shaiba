@@ -2,7 +2,7 @@ class_name CameraRig
 extends Node3D
 ## Angled top-down ("diorama") camera rig.
 ##
-## Perspective camera, pitched ~52° down with a narrow FOV — see the fixed
+## Perspective camera, pitched ~45° down with a narrow FOV — see the fixed
 ## decision in docs/DECISIONS.md. The rig follows a target position with
 ## damping and zooms on the scroll wheel between clamps. It deliberately does
 ## NOT move to avoid geometry: anything blocking the view is faded instead, by
@@ -27,7 +27,7 @@ signal yaw_changed(yaw: float)
 
 @export_group("Framing")
 ## Downward pitch in degrees, from horizontal.
-@export_range(20.0, 80.0, 0.5) var pitch_degrees: float = 52.0:
+@export_range(20.0, 80.0, 0.5) var pitch_degrees: float = 45.0:
 	set = set_pitch_degrees
 ## Rotation of the rig around the world Y axis, degrees.
 @export_range(0.0, 360.0, 45.0) var yaw_degrees: float = 0.0:

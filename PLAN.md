@@ -35,7 +35,7 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 ## Fixed decisions (do not re-litigate in later sessions)
 
 - **Engine:** Godot 4.7.1, Forward+ renderer. Repo root **is** the Godot project root.
-- **Camera:** angled top-down / near-isometric — perspective camera, pitched ≈ 50–55° down, slight FOV (~35°) for a "toy diorama" feel. Rotatable in 45° steps later if wanted; never free-look.
+- **Camera:** angled top-down / near-isometric — perspective camera, pitched ≈ 45° down (lowered from 52° for a more cinematic read, see DECISIONS.md), slight FOV (~35°) for a "toy diorama" feel. Rotatable in 45° steps later if wanted; never free-look.
 - **Art:** low-poly flat-shaded, palette-only materials (see `docs/ART_DIRECTION.md`). Blender sources in `assets/blender/`, exported `.glb` in `assets/models/`.
 - **World:** chunked terrain streamed around the player (see `docs/ARCHITECTURE.md`). Deterministic generation from a world seed.
 - **Code:** GDScript (typed), feature-folder organization, conventions in CLAUDE.md. No C# unless a profiled performance need forces it (record it in `docs/DECISIONS.md` if so).
@@ -85,6 +85,7 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 **Notes for later phases**
 - Tuning had one playtest pass with Joshua (2026-08-13): he asked for more weight on launches and sudden turns, and a further-out default camera. Result: acceleration 16, friction 24, turn_speed 7, new `turn_drag` 0.55, camera default 23 m (zoom 9–34).
 - The moveset then grew, also at Joshua's request: **run** (hold shift, 7.4 m/s), **jump** (space, 1.1 m, with coyote time / input buffer / variable height / reduced air control) and **crouch** (ctrl or C, 1.15 m capsule, 2.0 m/s, can't stand under a ceiling). Every value is an `@export` on `player.tscn` / `camera_rig.tscn`; reasoning and measurements are in DECISIONS.md.
+- A final polish pass (2026-08-13, after the gate passed) lowered the camera pitch 52° → 45° for a more cinematic read — Joshua compared 52/45/40 screenshots, played 45° and signed off. Occluder fading re-verified at the new angle. See DECISIONS.md.
 - **Knock-on for Phase 3:** the animation set is no longer just idle/walk/run — jump/fall/land and crouch poses are needed too. Phase 3's deliverables have been updated.
 - Camera obstruction is handled by fading, not by camera movement — the camera's distance is now purely the player's zoom. **Every new prop from Phase 6 on needs `collision_layer = 5`** (world + occluder) to be fadeable; terrain must stay on layer 1 alone so it never fades.
 - `graybox.tscn` is a permanent test level; keep it working as movement changes.
