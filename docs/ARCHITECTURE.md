@@ -23,6 +23,8 @@ scenes/
   world/
     world.tscn               # main scene: environment, terrain, spawns player+camera
     graybox.tscn             # permanent movement-test level (Phase 2)
+    level_root.gd            # `LevelRoot`: shared root script for both level scenes
+    desert_environment.tscn  # WorldEnvironment + sun, instanced by both levels
     terrain/                 # chunk_manager.gd, terrain_chunk.gd/.tscn (Phase 4)
   props/
     house/                   # house.tscn (+ collision), from assets/models/house.glb
@@ -57,4 +59,11 @@ Footprints can't be per-chunk geometry edits (too costly, breaks streaming). Ins
 
 ## Main scene flow
 
-`world.tscn` is the main scene. It owns: `WorldEnvironment` + `DirectionalLight3D` (per ART_DIRECTION lighting), `ChunkManager` (Phase 4+), and instances of `player` and `camera_rig`. The camera rig gets its follow target set by `world.tscn` at ready — the rig itself never searches the tree for the player.
+`world.tscn` is the main scene. It owns: `desert_environment.tscn` (`WorldEnvironment` + `DirectionalLight3D` per ART_DIRECTION lighting), `ChunkManager` (Phase 4+), and instances of `player` and `camera_rig`. The camera rig gets its follow target set by the level at ready — the rig itself never searches the tree for the player.
+
+Both playable level scenes (`world.tscn`, `graybox.tscn`) use `LevelRoot` as their root script. It does exactly one job, calling only *down* into its own children: hand the camera rig its follow target, and connect the rig's `yaw_changed` signal to the player's `set_view_yaw` so movement input stays camera-relative. Neither feature scene knows the other exists.
+
+## Physics conventions
+
+- **Collision layers:** 1 = world/terrain (and every static prop), 2 = player. The camera's obstruction cast masks layer 1 only, so it is never blocked by the player it frames.
+- **Physics interpolation is on project-wide.** Anything that moves does so in `_physics_process`, never `_process`, so gameplay nodes share one 60 Hz tick and interpolation smooths them to the render rate together. Code that teleports a node must call `reset_physics_interpolation()`.

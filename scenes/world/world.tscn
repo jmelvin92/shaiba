@@ -1,39 +1,33 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=8 format=3]
 
-[ext_resource type="Material" path="res://resources/palette/sand_mid.tres" id="1_sand"]
-
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
-sky_top_color = Color(0.560784, 0.721569, 0.788235, 1)
-sky_horizon_color = Color(1, 0.937255, 0.839216, 1)
-ground_bottom_color = Color(0.768627, 0.568627, 0.305882, 1)
-ground_horizon_color = Color(1, 0.937255, 0.839216, 1)
-
-[sub_resource type="Sky" id="Sky_sky"]
-sky_material = SubResource("ProceduralSkyMaterial_sky")
-
-[sub_resource type="Environment" id="Environment_env"]
-background_mode = 2
-sky = SubResource("Sky_sky")
-tonemap_mode = 2
+[ext_resource type="Script" path="res://scenes/world/level_root.gd" id="1_level"]
+[ext_resource type="PackedScene" path="res://scenes/world/desert_environment.tscn" id="2_env"]
+[ext_resource type="Material" path="res://resources/palette/sand_mid.tres" id="3_sand"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="4_player"]
+[ext_resource type="PackedScene" path="res://scenes/camera/camera_rig.tscn" id="5_camera"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
-material = ExtResource("1_sand")
+material = ExtResource("3_sand")
 size = Vector2(50, 50)
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_ground"]
+size = Vector3(50, 1, 50)
+
 [node name="World" type="Node3D"]
+script = ExtResource("1_level")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
-environment = SubResource("Environment_env")
+[node name="DesertEnvironment" parent="." instance=ExtResource("2_env")]
 
-[node name="Sun" type="DirectionalLight3D" parent="."]
-transform = Transform3D(0.866025, 0.321394, -0.383022, 0, 0.766044, 0.642788, 0.5, -0.55667, 0.663414, 0, 12, 0)
-light_color = Color(1, 0.913725, 0.768627, 1)
-light_energy = 1.2
-shadow_enabled = true
+[node name="Ground" type="StaticBody3D" parent="."]
 
-[node name="Ground" type="MeshInstance3D" parent="."]
+[node name="Mesh" type="MeshInstance3D" parent="Ground"]
 mesh = SubResource("PlaneMesh_ground")
 
-[node name="PreviewCamera" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.615661, 0.788011, 0, -0.788011, 0.615661, 0, 59.1, 46.2)
-fov = 35.0
+[node name="Collision" type="CollisionShape3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+shape = SubResource("BoxShape3D_ground")
+
+[node name="Player" parent="." instance=ExtResource("4_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
+
+[node name="CameraRig" parent="." instance=ExtResource("5_camera")]

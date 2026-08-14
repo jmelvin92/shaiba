@@ -12,7 +12,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 |-------|------|--------|--------|
 | 0 | Plan, repo & conventions | `main` | ✅ Done (2026-08-13) |
 | 1 | Godot project scaffold & core architecture | `feature/phase-1-scaffold` | ✅ Done (2026-08-13) |
-| 2 | Camera & movement (gray-box) | `feature/phase-2-camera-movement` | 🔲 Not started |
+| 2 | Camera & movement (gray-box) | `feature/phase-2-camera-movement` | ✅ Done (2026-08-13) |
 | 3 | Character model & animation | `feature/phase-3-character` | 🔲 Not started |
 | 4 | Terrain & chunk streaming | `feature/phase-4-terrain` | 🔲 Not started |
 | 5 | Sand footprint physics | `feature/phase-5-footprints` | 🔲 Not started |
@@ -76,11 +76,16 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 - Tuning documented: final values and *why they feel right* in DECISIONS.md.
 
 **Quality Gate**
-- [ ] Moving in all 8 directions feels responsive but weighty; no jitter, no foot-sliding of the capsule, no camera stutter (test at 60 fps+).
-- [ ] Slopes up to ~30° walkable, steeper blocked; no getting stuck on step edges in graybox.tscn.
-- [ ] Camera never clips geometry in the graybox scene; zoom clamps work.
-- [ ] All scripts typed GDScript, zero warnings.
-- [ ] PLAN.md updated; merged to `development`.
+- [x] Moving in all 8 directions feels responsive but weighty; no jitter, no foot-sliding of the capsule, no camera stutter (test at 60 fps+). *(Scripted run: all 8 directions reach exactly 4.60 m/s with diagonals normalised; full speed in ~0.18 s, stop in 0.15 s; zero drift while idle. At 120 fps the player's screen position held within 0.03 px of a straight line over 180 frames while walking.)*
+- [x] Slopes up to ~30° walkable, steeper blocked; no getting stuck on step edges in graybox.tscn. *(15/25/30° ramps climbed to full height; 40/50° refused. 0.25 m staircase walks up onto the landing; 0.20 m and 0.35 m curbs climb, 0.50 m refused.)*
+- [x] Camera never clips geometry in the graybox scene; zoom clamps work. *(Camera ducks to 1.86 m at the 6 m wall and in the yawed corridor, 1.96 m under the overhang, stays at 18 m in the open; zoom clamps hold at 9.00 and 28.00. Screenshot-checked at each spot — see the note below on cramped framing in the extreme cases.)*
+- [x] All scripts typed GDScript, zero warnings. *(`--import`, per-script `--check-only`, and headless runs of both level scenes: no errors or warnings.)*
+- [x] PLAN.md updated; merged to `development`.
+
+**Notes for later phases**
+- Tuning values are Claude's, verified by measurement but **not yet by feel** — Joshua should walk the graybox (`scenes/world/graybox.tscn`, F6) and say whether movement wants more weight, and whether the default 18 m camera distance sits right. Every value is an `@export` on `player.tscn` / `camera_rig.tscn`; reasoning is in DECISIONS.md.
+- Camera obstruction ducks the camera all the way in, so standing against something very tall (the graybox's 6 m wall) fills the screen with the player. Unavoidable at a 52° pitch — the fix is fading occluders, which belongs with Phase 6/7 when there are real tall props to fade. DECISIONS.md has the geometry.
+- `graybox.tscn` is a permanent test level; keep it working as movement changes.
 
 ## Phase 3 — Character model & animation
 

@@ -1,0 +1,205 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://scenes/world/level_root.gd" id="1_level"]
+[ext_resource type="PackedScene" path="res://scenes/world/desert_environment.tscn" id="2_env"]
+[ext_resource type="Material" path="res://resources/palette/sand_mid.tres" id="3_sand"]
+[ext_resource type="Material" path="res://resources/palette/plaster.tres" id="4_plaster"]
+[ext_resource type="Material" path="res://resources/palette/clay.tres" id="5_clay"]
+[ext_resource type="Material" path="res://resources/palette/accent_gold.tres" id="6_gold"]
+[ext_resource type="Material" path="res://resources/palette/sand_shadow.tres" id="7_shadow"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="8_player"]
+[ext_resource type="PackedScene" path="res://scenes/camera/camera_rig.tscn" id="9_camera"]
+
+[node name="Graybox" type="Node3D"]
+script = ExtResource("1_level")
+
+[node name="DesertEnvironment" parent="." instance=ExtResource("2_env")]
+
+[node name="Ground" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+use_collision = true
+size = Vector3(90, 1, 90)
+material = ExtResource("3_sand")
+
+[node name="Ramps" type="Node3D" parent="."]
+
+[node name="Ramp15" type="CSGBox3D" parent="Ramps"]
+transform = Transform3D(1, 0, 0, 0, 0.965926, -0.258819, 0, 0.258819, 0.965926, -20, 0.310832, -9.863703)
+use_collision = true
+size = Vector3(5, 1.5, 8)
+material = ExtResource("4_plaster")
+
+[node name="Ramp25" type="CSGBox3D" parent="Ramps"]
+transform = Transform3D(1, 0, 0, 0, 0.906308, -0.422618, 0, 0.422618, 0.906308, -10, 1.010742, -9.625231)
+use_collision = true
+size = Vector3(5, 1.5, 8)
+material = ExtResource("4_plaster")
+
+[node name="Ramp30" type="CSGBox3D" parent="Ramps"]
+transform = Transform3D(1, 0, 0, 0, 0.866025, -0.5, 0, 0.5, 0.866025, 0, 1.350481, -9.464102)
+use_collision = true
+size = Vector3(5, 1.5, 8)
+material = ExtResource("4_plaster")
+
+[node name="Ramp40" type="CSGBox3D" parent="Ramps"]
+transform = Transform3D(1, 0, 0, 0, 0.766044, -0.642788, 0, 0.642788, 0.766044, 10, 1.996617, -9.064178)
+use_collision = true
+size = Vector3(5, 1.5, 8)
+material = ExtResource("7_shadow")
+
+[node name="Ramp50" type="CSGBox3D" parent="Ramps"]
+transform = Transform3D(1, 0, 0, 0, 0.642788, -0.766044, 0, 0.766044, 0.642788, 20, 2.582087, -8.571150)
+use_collision = true
+size = Vector3(5, 1.5, 8)
+material = ExtResource("7_shadow")
+
+[node name="Stairs" type="Node3D" parent="."]
+
+[node name="Step1" type="CSGBox3D" parent="Stairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.125, -6.35)
+use_collision = true
+size = Vector3(5, 0.25, 0.7)
+material = ExtResource("5_clay")
+
+[node name="Step2" type="CSGBox3D" parent="Stairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.25, -7.05)
+use_collision = true
+size = Vector3(5, 0.5, 0.7)
+material = ExtResource("5_clay")
+
+[node name="Step3" type="CSGBox3D" parent="Stairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.375, -7.75)
+use_collision = true
+size = Vector3(5, 0.75, 0.7)
+material = ExtResource("5_clay")
+
+[node name="Step4" type="CSGBox3D" parent="Stairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.5, -8.45)
+use_collision = true
+size = Vector3(5, 1, 0.7)
+material = ExtResource("5_clay")
+
+[node name="Step5" type="CSGBox3D" parent="Stairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.625, -9.15)
+use_collision = true
+size = Vector3(5, 1.25, 0.7)
+material = ExtResource("5_clay")
+
+[node name="Step6" type="CSGBox3D" parent="Stairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.75, -9.85)
+use_collision = true
+size = Vector3(5, 1.5, 0.7)
+material = ExtResource("5_clay")
+
+[node name="Step7" type="CSGBox3D" parent="Stairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.875, -10.55)
+use_collision = true
+size = Vector3(5, 1.75, 0.7)
+material = ExtResource("5_clay")
+
+[node name="Landing" type="CSGBox3D" parent="Stairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.875, -12.9)
+use_collision = true
+size = Vector3(5, 1.75, 4)
+material = ExtResource("5_clay")
+
+[node name="Curbs" type="Node3D" parent="."]
+
+[node name="Curb020" type="CSGBox3D" parent="Curbs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 0.1, -2)
+use_collision = true
+size = Vector3(4, 0.2, 1.5)
+material = ExtResource("6_gold")
+
+[node name="Curb035" type="CSGBox3D" parent="Curbs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 0.175, -6)
+use_collision = true
+size = Vector3(4, 0.35, 1.5)
+material = ExtResource("6_gold")
+
+[node name="Curb050" type="CSGBox3D" parent="Curbs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 0.25, -10)
+use_collision = true
+size = Vector3(4, 0.5, 1.5)
+material = ExtResource("6_gold")
+
+[node name="CameraTests" type="Node3D" parent="."]
+
+[node name="TallWall" type="CSGBox3D" parent="CameraTests"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 10)
+use_collision = true
+size = Vector3(16, 6, 0.8)
+material = ExtResource("7_shadow")
+
+[node name="CorridorWallLeft" type="CSGBox3D" parent="CameraTests"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 1.5, 4)
+use_collision = true
+size = Vector3(0.8, 3, 12)
+material = ExtResource("5_clay")
+
+[node name="CorridorWallRight" type="CSGBox3D" parent="CameraTests"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 1.5, 4)
+use_collision = true
+size = Vector3(0.8, 3, 12)
+material = ExtResource("5_clay")
+
+[node name="OverhangRoof" type="CSGBox3D" parent="CameraTests"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18, 3.25, 6)
+use_collision = true
+size = Vector3(10, 0.5, 8)
+material = ExtResource("4_plaster")
+
+[node name="OverhangPillarA" type="CSGBox3D" parent="CameraTests"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22.5, 1.5, 2.5)
+use_collision = true
+size = Vector3(0.8, 3, 0.8)
+material = ExtResource("7_shadow")
+
+[node name="OverhangPillarB" type="CSGBox3D" parent="CameraTests"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.5, 1.5, 2.5)
+use_collision = true
+size = Vector3(0.8, 3, 0.8)
+material = ExtResource("7_shadow")
+
+[node name="OverhangPillarC" type="CSGBox3D" parent="CameraTests"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22.5, 1.5, 9.5)
+use_collision = true
+size = Vector3(0.8, 3, 0.8)
+material = ExtResource("7_shadow")
+
+[node name="OverhangPillarD" type="CSGBox3D" parent="CameraTests"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.5, 1.5, 9.5)
+use_collision = true
+size = Vector3(0.8, 3, 0.8)
+material = ExtResource("7_shadow")
+
+[node name="Obstacles" type="Node3D" parent="."]
+
+[node name="PillarA" type="CSGBox3D" parent="Obstacles"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.25, -2)
+use_collision = true
+size = Vector3(1.2, 2.5, 1.2)
+material = ExtResource("7_shadow")
+
+[node name="PillarB" type="CSGBox3D" parent="Obstacles"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1.25, 2)
+use_collision = true
+size = Vector3(1.2, 2.5, 1.2)
+material = ExtResource("7_shadow")
+
+[node name="PillarC" type="CSGBox3D" parent="Obstacles"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 1.25, -16)
+use_collision = true
+size = Vector3(1.2, 2.5, 1.2)
+material = ExtResource("7_shadow")
+
+[node name="PillarD" type="CSGBox3D" parent="Obstacles"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 1.25, -18)
+use_collision = true
+size = Vector3(1.2, 2.5, 1.2)
+material = ExtResource("7_shadow")
+
+[node name="Player" parent="." instance=ExtResource("8_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
+
+[node name="CameraRig" parent="." instance=ExtResource("9_camera")]
