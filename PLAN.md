@@ -14,7 +14,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 1 | Godot project scaffold & core architecture | `feature/phase-1-scaffold` | ✅ Done (2026-08-13) |
 | 2 | Camera & movement (gray-box) | `feature/phase-2-camera-movement` | ✅ Done (2026-08-13) |
 | 3 | Character model & animation | `feature/phase-3-character` | ✅ Done (2026-08-13) |
-| 4 | Terrain & chunk streaming | `feature/phase-4-terrain` | 🟡 In progress |
+| 4 | Terrain & chunk streaming | `feature/phase-4-terrain` | ✅ Done (2026-08-13) |
 | 5 | Sand footprint physics | `feature/phase-5-footprints` | 🔲 Not started |
 | 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🔲 Not started |
 | 7 | Integration & polish → v0.1 | `feature/phase-7-polish` | 🔲 Not started |
@@ -134,11 +134,19 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 - `tools/verify_terrain.gd`: determinism/seams/slope/depth audits, collision-vs-mesh raycast audit, 2 km streaming walk, deep-sand movement checks.
 
 **Quality Gate**
-- [ ] Walk continuously in one direction for 2+ km of world distance: no hitches > 4 ms from streaming, no visible pop-in gaps or seams between chunks, memory stable (chunks actually unload).
-- [ ] Same seed ⇒ identical terrain across runs; different seed ⇒ different desert.
-- [ ] Collision matches visuals — player never floats or sinks on any dune.
-- [ ] 60 fps+ on this Mac at default window size with full load radius.
-- [ ] PLAN.md updated; merged to `development`.
+- [x] Walk continuously in one direction for 2+ km of world distance: no hitches > 4 ms from streaming, no visible pop-in gaps or seams between chunks, memory stable (chunks actually unload). *(`verify_terrain --walk`, headless and windowed at the final radius 5: worst chunk-install cost 1.27 ms in any frame; chunk count plateaus at 132 within the 13×13 unload ring; memory +0.9 MB over the full 2 km; step-up never fired on terrain. Seams impossible by construction — shared edges bit-identical, asserted every run.)*
+- [x] Same seed ⇒ identical terrain across runs; different seed ⇒ different desert. *(Byte-identical double-build with a printable world hash; different seed produces a different hash.)*
+- [x] Collision matches visuals — player never floats or sinks on any dune. *(2,000-ray audit: raycasts land on the rendered mesh to 0.0000 m — HeightMapShape3D and the mesh share the same cell diagonal — and within 5 cm of the analytic field, the documented curvature bound.)*
+- [x] 60 fps+ on this Mac at default window size with full load radius. *(~185 fps average over the windowed 2 km walk; 67 of 76,396 frames exceeded 16.8 ms, every one with streaming idle and attributed to macOS window-server activity, including the documented occluded-window stall.)*
+- [x] PLAN.md updated; merged to `development`.
+
+**Notes for later phases**
+- **The camera changed mid-phase, at Joshua's request:** pitch 45° → **19°** (his pick from a seven-rung screenshot ladder), which brought load radius 5, the warm distance haze, and a terrain-clearance lift on the rig — see DECISIONS.md. **Joshua has not yet played** the 19° camera, the deep-sand movement feel, or the Phase 3 final tuning — the first minutes of Phase 5 (or a quick session before it) should be a playtest.
+- The Phase 3 pale-character-on-pale-sand worry mostly resolved itself at 19°: the figure now reads against midground amber dunes rather than pale ground. Judge finally in the Phase 7 pass.
+- Watch in playtest: whether dune crests hiding the player at 19° (rare by design) actually bothers, and whether the camera's Y-follow bobs on dune slopes at run speed (the flagged fix is a separate vertical follow damping on CameraRig).
+- Phase 5 hooks shipped and verified: `COLOR.a` = normalised sand depth per vertex, `get_sand_depth` everywhere, `jumped`/`landed(impact_speed)` signals, deformation extends `sand_terrain.gdshader` in place.
+- Phase 6 props: remember `collision_layer = 5` (fadeable) — terrain stays layer 1 alone. Prop scattering should key off `get_sand_depth` (palms want shallow sand near hard ground, not dune bodies).
+- The sand ripples read as soft mottle rather than crisp ripples at the gameplay camera; acceptable now, revisit when Phase 5's prints add surface detail.
 
 ## Phase 5 — Sand footprint physics (expanded with the sand-memory vision)
 
