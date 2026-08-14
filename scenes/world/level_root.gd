@@ -54,3 +54,4 @@ func _ready() -> void:
 	if sand != null:
 		sand.set_terrain(terrain)
 		sand.set_tracked(player)
+		player.stamped.connect(sand.stamp)

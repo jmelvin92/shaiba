@@ -1,7 +1,12 @@
 class_name SandDeformation
 extends Node3D
-## The sand's memory: accumulates footprint stamps into a deformation texture
-## that the terrain shader reads for vertex depression + a compacted tint.
+## The sand's memory: accumulates stamps into a deformation texture that the
+## terrain shader reads for vertex depression + a compacted darkening.
+##
+## Anything may mark the sand through [method stamp] — the level connects a
+## stamper's signal to it (the player's footfalls today, camel feet or dragged
+## objects later). This node knows nothing about who stamps; it only follows
+## its tracked node to keep the region centred.
 ##
 ## The texture covers a [member region_size] square of world space centred on
 ## the tracked player, held in a ping-pong pair of [SubViewport]s. Each update
@@ -14,30 +19,48 @@ extends Node3D
 ## Memory is "long but local" (PLAN.md Phase 5): prints persist for
 ## [member fade_seconds] near the player; walk far enough that they leave the
 ## region and they are quietly forgotten. Decay doubles as wind refilling the
-## prints.
+## prints, and the whole accumulation additionally migrates downwind by
+## [member wind_drift_per_minute] — in whole texels, keeping copies exact —
+## so old trails smear the way the dunes lie. A future real wind system
+## replaces the drift constant, nothing else.
 ##
 ## Cost model: nothing renders unless a pass is scheduled. Stamps and
 ## recentres trigger passes (rate-capped at [member max_update_hz]); while old
 ## prints are still fading, low-rate decay passes keep them moving; once the
 ## last print has fully faded the system goes completely idle — stand still
-## long enough and the frame cost is zero.
+## long enough and the frame cost is zero. [member last_pass_ms],
+## [member worst_pass_ms] and [member passes_run] expose the main-thread cost
+## for tools/verify_prints.gd.
 
 ## Passes per second while only decay is pending (no stamps, no recentre).
 const DECAY_HZ: float = 4.0
 ## Pixel size of the radial stamp brush texture.
 const STAMP_TEXTURE_SIZE: int = 64
 
+## One queued mark on the sand.
+class Stamp:
+	extends RefCounted
+
+	var at: Vector2
+	var radius: float
+	var strength: float
+	var angle: float
+	var stretch: float
+
+
 @export_group("Region")
 ## World-space width of the deformation region, metres.
 @export_range(32.0, 512.0, 32.0) var region_size: float = 128.0
 ## Deformation texture resolution. texels per metre = texture_size / region_size.
-@export_range(256, 4096, 256) var texture_size: int = 1024
+## A footprint is ~0.3 m across and needs 4+ texels to resolve without
+## aliasing — at 128 m regions that demands 2048 (16 texels/m).
+@export_range(256, 4096, 256) var texture_size: int = 2048
 ## How far the player may drift from the region's centre before it recentres.
 @export_range(2.0, 32.0, 0.5) var recenter_distance: float = 8.0
 
 @export_group("Prints")
 ## Depression of a full-strength print in metres of sand — scaled down by the
-## local normalised sand depth (vertex COLOR.a), so hard ground takes nothing.
+## local sand depth, so hard ground takes nothing.
 @export_range(0.0, 0.5, 0.01) var max_print_depth: float = 0.12
 ## How strongly a full print darkens the sand toward the compacted tint.
 @export_range(0.0, 1.0, 0.05) var tint_strength: float = 0.55
@@ -46,20 +69,20 @@ const STAMP_TEXTURE_SIZE: int = 64
 @export_range(0.05, 2.0, 0.05) var print_full_depth: float = 0.3
 ## Seconds for a full-strength print to fade back to untouched sand.
 @export_range(30.0, 600.0, 5.0) var fade_seconds: float = 180.0
+## Metres the accumulated prints migrate downwind per minute while fading.
+@export_range(0.0, 5.0, 0.1) var wind_drift_per_minute: float = 0.5
 ## Update-rate cap for stamp/recentre passes.
 @export_range(1.0, 30.0, 0.5) var max_update_hz: float = 12.0
 
-@export_group("Prototype stamping")
-## Distance between successive footfalls at a walk (one stamp every half of it).
-@export_range(0.2, 2.0, 0.05) var stride_length: float = 0.75
-## Radius of one footprint stamp, metres.
-@export_range(0.05, 1.0, 0.01) var foot_radius: float = 0.22
-## Sideways offset of each foot from the path centreline, metres.
-@export_range(0.0, 0.5, 0.01) var foot_offset: float = 0.14
-## Strength of a normal footstep (1 = presses the surface the full cap).
-@export_range(0.0, 1.0, 0.05) var stamp_strength: float = 0.85
-## Base radius of the stamp left by landing from a jump or fall.
-@export_range(0.0, 2.0, 0.05) var landing_radius: float = 0.45
+## Main-thread cost of the last texture pass, ms (scheduling + sprite setup;
+## the render itself is GPU-side). Read by verify tooling.
+var last_pass_ms: float = 0.0
+var worst_pass_ms: float = 0.0
+## Total passes rendered since load. Standing still with everything faded,
+## this must stop climbing — that is the "zero cost when idle" gate.
+var passes_run: int = 0
+## Verbose per-pass logging, for verify tooling chasing texture bugs.
+var debug_log: bool = false
 
 var _terrain_material: ShaderMaterial = preload(
 	"res://resources/terrain/sand_terrain_material.tres"
@@ -73,16 +96,17 @@ var _stamp_roots: Array[Node2D] = []
 var _read: int = 0
 ## World xz of the region's minimum corner, snapped to the texel grid.
 var _origin: Vector2 = Vector2.ZERO
-var _tracked: CharacterBody3D = null
-## Queued stamps as (world x, world z, radius m, strength 0..1).
-var _pending: Array[Vector4] = []
+var _tracked: Node3D = null
+var _pending: Array[Stamp] = []
 var _time: float = 0.0
 var _last_pass: float = 0.0
 var _last_pass_frame: int = -1
 ## While _time is below this, prints may still be fading and decay passes run.
 var _content_until: float = -1.0
-var _distance_to_step: float = 0.0
-var _left_foot: bool = false
+## Downwind unit direction in world xz, from the terrain's wind yaw.
+var _wind_direction: Vector2 = Vector2.ZERO
+## Sub-texel wind displacement carried until it amounts to a whole texel.
+var _wind_carry: Vector2 = Vector2.ZERO
 var _stamp_texture: GradientTexture2D
 var _stamp_material: CanvasItemMaterial
 
@@ -122,63 +146,66 @@ func _exit_tree() -> void:
 
 
 ## Called by the owning level: rescales the vertex-alpha depth cap from the
-## colour ramp's normalisation to this rig's [member print_full_depth].
+## colour ramp's normalisation to this rig's [member print_full_depth], and
+## reads the wind direction the drift leans with.
 func set_terrain(terrain: TerrainSettings) -> void:
 	_terrain_material.set_shader_parameter(
 		"deform_cap_scale", terrain.tone_full_depth / print_full_depth
 	)
+	var yaw: float = deg_to_rad(terrain.wind_yaw_degrees)
+	_wind_direction = Vector2(cos(yaw), sin(yaw))
 
 
-## Called by the owning level (see LevelRoot): who leaves prints in the sand.
-func set_tracked(target: CharacterBody3D) -> void:
+## Called by the owning level: whose position the region follows.
+func set_tracked(target: Node3D) -> void:
 	_tracked = target
-	if target.has_signal("landed"):
-		target.connect("landed", _on_landed)
 	_origin = _snapped_origin()
 	_terrain_material.set_shader_parameter("deform_origin", _origin)
+
+
+## Mark the sand. Anything may call this (usually via a stamper signal the
+## level connected): position/radius in world metres, strength 0–1, angle in
+## radians, stretch elongating the mark along its angle.
+func stamp(
+	world_xz: Vector2,
+	radius: float,
+	strength: float,
+	angle: float = 0.0,
+	stretch: float = 1.0
+) -> void:
+	var entry: Stamp = Stamp.new()
+	entry.at = world_xz
+	entry.radius = radius
+	entry.strength = strength
+	entry.angle = angle
+	entry.stretch = stretch
+	_pending.append(entry)
+
+
+## True when nothing is queued and every print has fully faded — the state in
+## which this system costs exactly nothing per frame.
+func is_idle() -> bool:
+	return _pending.is_empty() and _time >= _content_until
+
+
+## Current region origin and the accumulated texture, for verify tooling.
+func get_debug_state() -> Dictionary:
+	return {
+		"origin": _origin,
+		"texture": _viewports[_read].get_texture(),
+	}
 
 
 func _physics_process(delta: float) -> void:
 	_time += delta
 	if _tracked == null:
 		return
-	_clock_footsteps(delta)
-
 	var since_pass: float = _time - _last_pass
 	if not _pending.is_empty() or _needs_recenter():
 		if since_pass >= 1.0 / max_update_hz:
 			_run_pass()
 	elif _time < _content_until and since_pass >= 1.0 / DECAY_HZ:
 		_run_pass()
-
-
-## Prototype stamping: footfalls clocked by distance travelled, alternating
-## feet either side of the path. The real thing (later this phase) times
-## stamps to the walk/run animation's toe bones instead.
-func _clock_footsteps(delta: float) -> void:
-	var planar: Vector2 = Vector2(_tracked.velocity.x, _tracked.velocity.z)
-	var speed: float = planar.length()
-	if not _tracked.is_on_floor() or speed < 0.3:
-		return
-	_distance_to_step -= speed * delta
-	if _distance_to_step > 0.0:
-		return
-	_distance_to_step += stride_length * 0.5
-
-	var forward: Vector2 = planar / speed
-	var side: Vector2 = Vector2(-forward.y, forward.x)
-	var sign_offset: float = foot_offset if _left_foot else -foot_offset
-	_left_foot = not _left_foot
-	var at: Vector2 = Vector2(
-		_tracked.global_position.x, _tracked.global_position.z
-	) + side * sign_offset
-	_pending.append(Vector4(at.x, at.y, foot_radius, stamp_strength))
-
-
-func _on_landed(impact_speed: float) -> void:
-	var at: Vector2 = Vector2(_tracked.global_position.x, _tracked.global_position.z)
-	var radius: float = landing_radius * clampf(0.5 + impact_speed * 0.12, 0.7, 1.4)
-	_pending.append(Vector4(at.x, at.y, radius, 1.0))
 
 
 func _needs_recenter() -> bool:
@@ -190,34 +217,51 @@ func _needs_recenter() -> bool:
 
 
 ## One ping-pong update: carry the accumulation into the write viewport
-## (shifted + decayed), draw pending stamps on top, point the terrain at it.
+## (shifted + decayed + wind-drifted), draw pending stamps on top, point the
+## terrain at it.
 func _run_pass() -> void:
 	# The read viewport must actually have rendered since the last pass, or
 	# this would copy from a stale texture and drop that pass's stamps —
 	# possible when physics ticks outpace drawn frames (high Engine.time_scale).
 	if Engine.get_frames_drawn() == _last_pass_frame:
 		return
+	var started: int = Time.get_ticks_usec()
 	_last_pass_frame = Engine.get_frames_drawn()
 	var write: int = 1 - _read
+	var elapsed: float = _time - _last_pass
 	var new_origin: Vector2 = _snapped_origin() if _needs_recenter() else _origin
 
+	# Wind migration accumulates until it amounts to whole texels, then rides
+	# along as an extra content shift — still an exact texel-for-texel copy.
+	var texel: float = region_size / float(texture_size)
+	_wind_carry += _wind_direction * (wind_drift_per_minute / 60.0) * elapsed
+	var wind_step: Vector2 = Vector2(
+		floorf(_wind_carry.x / texel), floorf(_wind_carry.y / texel)
+	) * texel
+	_wind_carry -= wind_step
+
 	var copy: ShaderMaterial = _copy_materials[write]
-	copy.set_shader_parameter("uv_shift", (new_origin - _origin) / region_size)
-	copy.set_shader_parameter("decay_amount", (_time - _last_pass) / fade_seconds)
+	var uv_shift: Vector2 = (new_origin - _origin - wind_step) / region_size
+	if debug_log:
+		print("[sand] pass %d: shift %s decay %.4f pending %d" % [
+			passes_run, uv_shift, elapsed / fade_seconds, _pending.size(),
+		])
+	copy.set_shader_parameter("uv_shift", uv_shift)
+	copy.set_shader_parameter("decay_amount", elapsed / fade_seconds)
 
 	var stamps: Node2D = _stamp_roots[write]
 	for child: Node in stamps.get_children():
 		child.free()
 	var px_per_m: float = float(texture_size) / region_size
-	for stamp: Vector4 in _pending:
+	for entry: Stamp in _pending:
 		var sprite: Sprite2D = Sprite2D.new()
 		sprite.texture = _stamp_texture
 		sprite.material = _stamp_material
-		sprite.position = (Vector2(stamp.x, stamp.y) - new_origin) * px_per_m
-		sprite.scale = Vector2.ONE * (
-			stamp.z * 2.0 * px_per_m / float(STAMP_TEXTURE_SIZE)
-		)
-		sprite.modulate = Color(stamp.w, stamp.w, stamp.w, 1.0)
+		sprite.position = (entry.at - new_origin) * px_per_m
+		sprite.rotation = entry.angle
+		var base: float = entry.radius * 2.0 * px_per_m / float(STAMP_TEXTURE_SIZE)
+		sprite.scale = Vector2(base * entry.stretch, base)
+		sprite.modulate = Color(entry.strength, entry.strength, entry.strength, 1.0)
 		stamps.add_child(sprite)
 	if not _pending.is_empty():
 		_content_until = _time + fade_seconds
@@ -231,6 +275,9 @@ func _run_pass() -> void:
 	_origin = new_origin
 	_read = write
 	_last_pass = _time
+	passes_run += 1
+	last_pass_ms = float(Time.get_ticks_usec() - started) / 1000.0
+	worst_pass_ms = maxf(worst_pass_ms, last_pass_ms)
 
 
 ## Region origin that centres the player, snapped to whole texels so recentre
