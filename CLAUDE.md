@@ -81,7 +81,15 @@ Everything visual obeys `docs/ART_DIRECTION.md` — the fixed color palette (hex
 - **`godot`** — `node ~/tools/godot-mcp/build/index.js` with `GODOT_PATH=/Applications/Godot.app/Contents/MacOS/Godot`. Can create/edit scenes and scripts, launch the editor, run the project, and read debug output.
   - Quirks (verified Phase 1): works against this project. `run_project` launches in debug mode; call `stop_project` before re-running. `get_debug_output` returns accumulated stdout plus a separate `errors` array — check both. The game window opens *behind* other apps; to screenshot it, first `osascript -e 'tell application "System Events" to set frontmost of (first process whose name contains "Godot") to true'`, then `screencapture -x <file>`.
 
+## Hand-authoring `.tscn` files
+
+- **`Transform3D(...)` with 12 floats is row-major.** The first nine are `basis.rows[0]`, `rows[1]`, `rows[2]` — *not* the x/y/z basis columns. A rotation of θ about X is therefore `Transform3D(1,0,0, 0,cosθ,-sinθ, 0,sinθ,cosθ, ox,oy,oz)`. Writing the columns instead silently gives you the *inverse* rotation, which looks plausible in a screenshot and only shows up as wrong collision. (Cost a debugging round in Phase 2.)
+- Verify any hand-written scene before trusting it: `Godot --headless --path . --import` catches parse errors, and `--headless --path . res://scene.tscn --quit-after 300` catches runtime ones. For script warnings, `--headless --path . --check-only --script res://x.gd` per script.
+- Godot re-computes `load_steps` on save, but get it right anyway: it is `ext_resources + sub_resources + 1`.
+
 ## Environment quirks
 
 - `~/.npm/_cacache` contains root-owned files (old `sudo npm` run), so plain `npm install` fails with `EACCES`. Workaround: `npm install --cache <scratch-dir>`. Permanent fix (needs Joshua): `sudo chown -R joshua ~/.npm`.
+- **macOS stops rendering an occluded game window.** A running project keeps ticking physics but never draws, so anything awaiting `RenderingServer.frame_post_draw` (in-game screenshots) hangs until the window is brought forward. When driving the game from a script, keep re-focusing it: `osascript -e 'tell application "System Events" to set frontmost of (first process whose name contains "Godot") to true'`.
+- `print()` from a running project is block-buffered when piped, so nothing appears until the process exits. For long automated runs, have the script write progress to a file (open/store/close per line) and poll that instead.
 - The blender-mcp addon predates Blender 5.x but installs and registers cleanly on 5.2. If a Blender API call fails, suspect a 4.x→5.x API change before anything else; patching the addon (`~/tools/blender-mcp-addon.py`, installed copy in `~/Library/Application Support/Blender/5.2/scripts/addons/blender_mcp_addon.py`) is fair game.
