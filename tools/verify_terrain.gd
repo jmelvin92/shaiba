@@ -52,6 +52,12 @@ func _run() -> void:
 	if args.has("--collision"):
 		await _collision_audit()
 		return
+	if args.has("--walk"):
+		await _walk(args)
+		return
+	if args.has("--sand"):
+		await _sand()
+		return
 	push_error("verify_terrain: unknown mode %s" % " ".join(args))
 	_failures.append("unknown mode: " + " ".join(args))
 
@@ -213,6 +219,231 @@ func _collision_audit() -> void:
 
 	level.queue_free()
 	await physics_frame
+
+
+## Walks the player 2 km in a straight line through streaming terrain and
+## watches what the gate cares about: per-frame wall time (worst frame, count
+## over 4 ms), the loaded-chunk count (must plateau — proof that unloading
+## works), memory drift, and the largest one-tick grounded rise of the player
+## (a step-up false-triggering on a chunk seam would spike it).
+##
+## Headless, physics runs on the wall clock, so 2 km at run speed is ~7 min;
+## `Engine.time_scale` is raised to compress that. Frame-time numbers under
+## time_scale measure the same per-frame streaming work, just denser — the
+## windowed run without time_scale is the honest fps gate. Progress goes to
+## user://walk_progress.txt because piped print is block-buffered (CLAUDE.md).
+func _walk(args: PackedStringArray) -> void:
+	var realtime: bool = args.has("--realtime")
+	if not realtime:
+		Engine.time_scale = 4.0
+
+	var level: Node3D = (load("res://scenes/world/world.tscn") as PackedScene).instantiate() as Node3D
+	root.add_child(level)
+	await physics_frame
+	await physics_frame
+	var player: Player = level.find_child("Player", true, false) as Player
+	var manager: ChunkManager = level.find_child("ChunkManager", true, false) as ChunkManager
+
+	# Let the spawn build and the first frames settle before measuring.
+	for _i: int in range(120):
+		await physics_frame
+
+	var progress_path: String = "user://walk_progress.txt"
+	var start_z: float = player.global_position.z
+	var start_memory: float = Performance.get_monitor(Performance.MEMORY_STATIC)
+	var worst_frame_ms: float = 0.0
+	var over_budget: int = 0
+	var frames: int = 0
+	var max_loaded: int = 0
+	var end_loaded: int = 0
+	var max_rise: float = 0.0
+	var last_y: float = player.global_position.y
+	var was_grounded: bool = true
+	var last_usec: int = Time.get_ticks_usec()
+
+	Input.action_press("move_up")
+	Input.action_press("sprint")
+	var wall_start: int = Time.get_ticks_usec()
+	while absf(player.global_position.z - start_z) < 2000.0:
+		await process_frame
+		var now: int = Time.get_ticks_usec()
+		var frame_ms: float = float(now - last_usec) / 1000.0
+		last_usec = now
+		frames += 1
+		if frame_ms > worst_frame_ms:
+			worst_frame_ms = frame_ms
+		if frame_ms > 4.0:
+			over_budget += 1
+
+		var grounded: bool = player.is_on_floor()
+		var y: float = player.global_position.y
+		if grounded and was_grounded:
+			max_rise = maxf(max_rise, y - last_y)
+		last_y = y
+		was_grounded = grounded
+
+		end_loaded = manager.get_loaded_count()
+		max_loaded = maxi(max_loaded, end_loaded)
+
+		if frames % 600 == 0:
+			var log_file: FileAccess = FileAccess.open(progress_path, FileAccess.WRITE)
+			log_file.store_line(
+				"z %.0f m, %d frames, worst %.2f ms, loaded %d"
+				% [absf(player.global_position.z - start_z), frames, worst_frame_ms, end_loaded]
+			)
+			log_file.close()
+		if Time.get_ticks_usec() - wall_start > 25 * 60 * 1000 * 1000:
+			_fail("walk: aborted after 25 min wall time without covering 2 km")
+			break
+	Input.action_release("move_up")
+	Input.action_release("sprint")
+	Engine.time_scale = 1.0
+
+	var memory_delta_mb: float = (
+		Performance.get_monitor(Performance.MEMORY_STATIC) - start_memory
+	) / 1048576.0
+	var full_grid: int = (2 * manager.load_radius + 1) * (2 * manager.load_radius + 1)
+	var max_grid: int = (2 * manager.unload_radius + 1) * (2 * manager.unload_radius + 1)
+	print(
+		"walk: %d frames over %.0f m; whole frame worst %.2f ms, %d > 4 ms (%.2f%%); "
+		% [frames, absf(player.global_position.z - start_z), worst_frame_ms, over_budget,
+			100.0 * over_budget / maxf(frames, 1.0)]
+		+ "streaming apply worst %.2f ms; loaded now %d (max %d), memory %+.1f MB, "
+		% [manager.worst_apply_ms, end_loaded, max_loaded, memory_delta_mb]
+		+ "max grounded rise %.3f m/tick"
+		% [max_rise]
+	)
+	if manager.worst_apply_ms > 4.0:
+		_fail(
+			"walk: installing chunks took %.2f ms in one frame (budget is 4 ms)"
+			% manager.worst_apply_ms
+		)
+	if end_loaded > max_grid:
+		_fail("walk: %d chunks still loaded at the end — unloading is not working" % end_loaded)
+	if end_loaded < full_grid:
+		_fail("walk: only %d chunks loaded at the end (full grid is %d)" % [end_loaded, full_grid])
+	if max_loaded > max_grid + 8:
+		_fail("walk: loaded count peaked at %d — far past the unload ring %d" % [max_loaded, max_grid])
+	if memory_delta_mb > 500.0:
+		_fail("walk: static memory grew %.0f MB over one walk" % memory_delta_mb)
+	if max_rise > 0.30:
+		_fail(
+			"walk: player rose %.3f m in one grounded tick — step-up fired on terrain"
+			% max_rise
+		)
+
+	level.queue_free()
+	await physics_frame
+
+
+## Verifies the deep-sand movement hooks against the real desert: walking
+## speed at a deep spot and a shallow spot must each match what the depth
+## there predicts, and standing in deep sand must visibly sink the mesh.
+## (That the hooks stay inert off-terrain is verify_player's default suite —
+## it measures full walking speed on the terrain-less graybox.)
+func _sand() -> void:
+	var level: Node3D = (load("res://scenes/world/world.tscn") as PackedScene).instantiate() as Node3D
+	root.add_child(level)
+	await physics_frame
+	await physics_frame
+	var player: Player = level.find_child("Player", true, false) as Player
+	var manager: ChunkManager = level.find_child("ChunkManager", true, false) as ChunkManager
+	var terrain: TerrainSettings = manager.get_terrain()
+
+	# Flattest markedly-deep and markedly-shallow spots near the spawn, so the
+	# speed reading is not fighting a dune face.
+	var deep_spot: Vector2 = _flattest_where(terrain, func(depth: float) -> bool:
+		return depth > 0.8)
+	var shallow_spot: Vector2 = _flattest_where(terrain, func(depth: float) -> bool:
+		return depth < 0.25)
+
+	for spot: Vector2 in [deep_spot, shallow_spot]:
+		var label: String = "deep" if spot == deep_spot else "shallow"
+		_teleport(player, manager, terrain, spot)
+		for _i: int in range(30):
+			await physics_frame
+
+		Input.action_press("move_up")
+		var speeds: Array[float] = []
+		var factors: Array[float] = []
+		for i: int in range(150):
+			await physics_frame
+			if i >= 90:
+				speeds.append(player.get_planar_speed())
+				factors.append(
+					clampf(
+						terrain.get_sand_depth(
+							Vector2(player.global_position.x, player.global_position.z)
+						) / player.deep_sand_depth,
+						0.0, 1.0
+					)
+				)
+		Input.action_release("move_up")
+		speeds.sort()
+		factors.sort()
+		var actual: float = speeds[speeds.size() / 2]
+		var factor: float = factors[factors.size() / 2]
+		var expected: float = player.walk_speed * lerpf(1.0, player.deep_sand_speed_scale, factor)
+		print(
+			"sand %s: depth factor %.2f, expected %.2f m/s, measured %.2f m/s"
+			% [label, factor, expected, actual]
+		)
+		if absf(actual - expected) > expected * 0.1:
+			_fail(
+				"sand %s: walking at %.2f m/s where depth predicts %.2f m/s"
+				% [label, actual, expected]
+			)
+
+	# Standing still in deep sand: the mesh should settle visibly below the
+	# collider.
+	_teleport(player, manager, terrain, deep_spot)
+	for _i: int in range(90):
+		await physics_frame
+	var visual: Node3D = player.get_node(^"Visual") as Node3D
+	var sink: float = visual.position.y
+	var wanted: float = -minf(
+		terrain.get_sand_depth(Vector2(player.global_position.x, player.global_position.z))
+		* player.sand_sink_ratio,
+		player.sand_sink_max
+	)
+	print("sand sink: visual offset %.3f m (target %.3f m)" % [sink, wanted])
+	if absf(sink - wanted) > 0.02:
+		_fail("sand sink: mesh sits at %.3f m, expected %.3f m" % [sink, wanted])
+
+	level.queue_free()
+	await physics_frame
+
+
+## Scans a ring around the spawn for positions whose depth satisfies
+## [param wanted] and returns the one with the least local slope.
+func _flattest_where(terrain: TerrainSettings, wanted: Callable) -> Vector2:
+	var best: Vector2 = Vector2.ZERO
+	var best_slope: float = INF
+	for x: int in range(-240, 241, 8):
+		for z: int in range(-240, 241, 8):
+			var at: Vector2 = Vector2(x, z)
+			if not wanted.call(terrain.get_sand_depth(at)):
+				continue
+			var dx: float = terrain.get_surface_height(at + Vector2(1.0, 0.0)) \
+				- terrain.get_surface_height(at - Vector2(1.0, 0.0))
+			var dz: float = terrain.get_surface_height(at + Vector2(0.0, 1.0)) \
+				- terrain.get_surface_height(at - Vector2(0.0, 1.0))
+			var slope: float = dx * dx + dz * dz
+			if slope < best_slope:
+				best_slope = slope
+				best = at
+	return best
+
+
+## Moves the player somewhere possibly unloaded: the manager synchronously
+## fills the chunks around the new spot before the player can fall through.
+func _teleport(
+	player: Player, manager: ChunkManager, terrain: TerrainSettings, at: Vector2
+) -> void:
+	player.velocity = Vector3.ZERO
+	player.global_position = Vector3(at.x, terrain.get_surface_height(at) + 0.1, at.y)
+	player.reset_physics_interpolation()
+	manager.set_tracked(player)
 
 
 ## The visual mesh's own piecewise-linear height at [param at]: bilinear cell

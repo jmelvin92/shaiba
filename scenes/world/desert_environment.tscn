@@ -24,3 +24,4 @@ transform = Transform3D(0.866025, 0.321394, -0.383022, 0, 0.766044, 0.642788, 0.
 light_color = Color(1, 0.913725, 0.768627, 1)
 light_energy = 1.2
 shadow_enabled = true
+directional_shadow_max_distance = 130.0

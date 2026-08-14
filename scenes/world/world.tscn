@@ -1,11 +1,12 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scenes/world/level_root.gd" id="1_level"]
 [ext_resource type="PackedScene" path="res://scenes/world/desert_environment.tscn" id="2_env"]
 [ext_resource type="Script" path="res://scenes/world/terrain/chunk_manager.gd" id="3_chunks"]
 [ext_resource type="Resource" path="res://resources/terrain/desert.tres" id="4_desert"]
-[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="5_player"]
-[ext_resource type="PackedScene" path="res://scenes/camera/camera_rig.tscn" id="6_camera"]
+[ext_resource type="PackedScene" path="res://scenes/world/terrain/terrain_debug_overlay.tscn" id="5_overlay"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="6_player"]
+[ext_resource type="PackedScene" path="res://scenes/camera/camera_rig.tscn" id="7_camera"]
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_level")
@@ -16,7 +17,9 @@ script = ExtResource("1_level")
 script = ExtResource("3_chunks")
 settings = ExtResource("4_desert")
 
-[node name="Player" parent="." instance=ExtResource("5_player")]
+[node name="DebugOverlay" parent="ChunkManager" instance=ExtResource("5_overlay")]
+
+[node name="Player" parent="." instance=ExtResource("6_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
 
-[node name="CameraRig" parent="." instance=ExtResource("6_camera")]
+[node name="CameraRig" parent="." instance=ExtResource("7_camera")]

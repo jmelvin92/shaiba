@@ -13,13 +13,17 @@ extends StaticBody3D
 ## uses ((x+1, z) → (x, z+1)), so collision and visuals are the same surface.
 ## tools/verify_terrain.gd --collision audits exactly that.
 
-## Everything a worker thread produces for one chunk. Small and immutable-by-
-## convention: built off-thread, read once on the main thread.
+## Everything a worker thread produces for one chunk. The mesh travels as raw
+## arrays, not an ArrayMesh: creating rendering resources off the main thread
+## works on the real renderer but corrupts RIDs under the headless dummy
+## renderer, and the main-thread add_surface_from_arrays for one chunk is
+## well under a millisecond anyway. The collision shape has no such problem —
+## the physics server takes it happily from a worker.
 class BuildData:
 	extends RefCounted
 
 	var coord: Vector2i
-	var mesh: ArrayMesh
+	var arrays: Array
 	var shape: HeightMapShape3D
 	## Where the collision shape sits in chunk-local space: HeightMapShape3D is
 	## centred on its owner, while the mesh spans [0, size] from the chunk origin.
@@ -110,8 +114,6 @@ static func build_data(settings: TerrainSettings, coord: Vector2i) -> BuildData:
 	arrays[Mesh.ARRAY_VERTEX] = vertices
 	arrays[Mesh.ARRAY_COLOR] = colors
 	arrays[Mesh.ARRAY_INDEX] = indices
-	var mesh: ArrayMesh = ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 
 	var shape: HeightMapShape3D = HeightMapShape3D.new()
 	shape.map_width = n
@@ -120,7 +122,7 @@ static func build_data(settings: TerrainSettings, coord: Vector2i) -> BuildData:
 
 	var data: BuildData = BuildData.new()
 	data.coord = coord
-	data.mesh = mesh
+	data.arrays = arrays
 	data.shape = shape
 	# The heightmap's samples are centred on the shape's origin; the mesh spans
 	# [0, cells × cell] from the chunk origin. Half the span reconciles them.
@@ -129,9 +131,12 @@ static func build_data(settings: TerrainSettings, coord: Vector2i) -> BuildData:
 	return data
 
 
-## Installs a finished build on this chunk. Main thread only.
+## Installs a finished build on this chunk. Main thread only — this is where
+## the ArrayMesh resource actually gets created (see BuildData).
 func apply(data: BuildData) -> void:
-	_mesh_instance.mesh = data.mesh
+	var mesh: ArrayMesh = ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, data.arrays)
+	_mesh_instance.mesh = mesh
 	_collision.shape = data.shape
 	_collision.position = data.collision_offset
 

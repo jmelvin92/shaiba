@@ -85,6 +85,24 @@ const STEP_CLEARANCE: float = 0.02
 ## Multiplier on project gravity. > 1 keeps the fall from feeling floaty.
 @export_range(0.0, 5.0, 0.1) var gravity_scale: float = 1.4
 
+@export_group("Sand")
+## Sand depth at which the deep-sand effects reach full strength, metres.
+## Shallower sand scales every effect down proportionally.
+@export_range(0.05, 2.0, 0.05) var deep_sand_depth: float = 0.4
+## Multiplier on movement speed when the sand is fully deep — wading through
+## a dune should cost something.
+@export_range(0.2, 1.0, 0.05) var deep_sand_speed_scale: float = 0.6
+## Multiplier on jump height in fully deep sand: soft ground gives a soft
+## launch.
+@export_range(0.2, 1.0, 0.05) var deep_sand_jump_scale: float = 0.75
+## Fraction of the local sand depth the feet visibly sink into the surface.
+@export_range(0.0, 1.0, 0.05) var sand_sink_ratio: float = 0.35
+## Deepest the feet ever sink visually, metres — past this the effect would
+## read as clipping, not sinking.
+@export_range(0.0, 0.3, 0.01) var sand_sink_max: float = 0.12
+## How quickly the visible sink follows changes in depth underfoot.
+@export_range(1.0, 40.0, 0.5) var sand_sink_speed: float = 8.0
+
 ## Emitted the moment a jump actually launches, not when the key is pressed.
 signal jumped
 ## Emitted on touchdown, carrying the downward speed at impact in m/s.
@@ -125,6 +143,11 @@ var _step_grace_left: float = 0.0
 ## velocity.y captured before move_and_slide, so a landing can report the speed
 ## it arrived at rather than the zero it has afterwards.
 var _fall_speed: float = 0.0
+## Sand depth under the player this tick, metres. 0 whenever there is no
+## terrain, which is what keeps every sand effect inert on the graybox.
+var _sand_depth: float = 0.0
+## How far the mesh is currently lowered to show the feet settling into sand.
+var _sink_offset: float = 0.0
 
 
 func _ready() -> void:
@@ -146,6 +169,11 @@ func set_terrain(terrain: TerrainSettings) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _terrain != null:
+		_sand_depth = _terrain.get_sand_depth(
+			Vector2(global_position.x, global_position.z)
+		)
+
 	var input_vector: Vector2 = Input.get_vector(
 		"move_left", "move_right", "move_up", "move_down"
 	)
@@ -206,13 +234,22 @@ func _physics_process(delta: float) -> void:
 	_animator.set_locomotion(_planar_speed, footed, _crouched)
 
 
-## The pace being asked for: crouching beats sprinting, sprinting beats walking.
+## The pace being asked for: crouching beats sprinting, sprinting beats
+## walking — then deep sand takes its share of whichever gait won. Because the
+## animation blends off the speed actually reached, slowing the target here
+## slows the stride to match for free.
 func _target_speed() -> float:
+	var base: float = walk_speed
 	if _crouched:
-		return crouch_speed
-	if Input.is_action_pressed("sprint"):
-		return run_speed
-	return walk_speed
+		base = crouch_speed
+	elif Input.is_action_pressed("sprint"):
+		base = run_speed
+	return base * lerpf(1.0, deep_sand_speed_scale, _sand_factor())
+
+
+## How deep in sand the player is, 0 (none/hard ground) to 1 (full effect).
+func _sand_factor() -> float:
+	return clampf(_sand_depth / deep_sand_depth, 0.0, 1.0)
 
 
 ## True while crouched, for anyone driving animation off this controller.
@@ -236,13 +273,23 @@ func _absorb_step(rise: float) -> void:
 	_step_offset = clampf(_step_offset - rise, -max_step_height, max_step_height)
 
 
+## Single writer of the visual's height: the step-absorb offset decays back to
+## zero while the sand sink eases toward the local depth, and the mesh shows
+## the sum of both.
 func _settle_step(delta: float) -> void:
-	if is_zero_approx(_step_offset) and is_zero_approx(_visual.position.y):
-		return
 	_step_offset = lerpf(_step_offset, 0.0, 1.0 - exp(-step_smoothing * delta))
 	if absf(_step_offset) < 0.001:
 		_step_offset = 0.0
-	_visual.position.y = _step_offset
+
+	# Feet only settle while they are on the ground; a jump lifts them out.
+	var sink_target: float = 0.0
+	if is_on_floor() or _step_grace_left > 0.0:
+		sink_target = minf(_sand_depth * sand_sink_ratio, sand_sink_max)
+	_sink_offset = lerpf(_sink_offset, sink_target, 1.0 - exp(-sand_sink_speed * delta))
+	if _sink_offset < 0.001 and sink_target == 0.0:
+		_sink_offset = 0.0
+
+	_visual.position.y = _step_offset - _sink_offset
 
 
 ## Follows the crouch key, except that you cannot stand up under something.
@@ -293,7 +340,9 @@ func _update_jump(delta: float) -> void:
 		_jump_buffer_left = maxf(_jump_buffer_left - delta, 0.0)
 
 	if _jump_buffer_left > 0.0 and _coyote_left > 0.0 and not _crouched:
-		velocity.y = sqrt(2.0 * get_gravity().length() * gravity_scale * jump_height)
+		# Deep sand softens the launch the same way it slows the stride.
+		var height: float = jump_height * lerpf(1.0, deep_sand_jump_scale, _sand_factor())
+		velocity.y = sqrt(2.0 * get_gravity().length() * gravity_scale * height)
 		_jump_buffer_left = 0.0
 		_coyote_left = 0.0
 		_animator.play_jump()

@@ -7,14 +7,15 @@ extends SceneTree
 ## cannot judge reliably: whether a planted foot stays put in world space while
 ## the body moves, and whether any state change flashes the bind pose.
 
-## Foot measurements need open flat ground; graybox is full of things to trip
-## over, and a player who leaves the floor makes every frame look "planted".
-const LEVEL: String = "res://scenes/world/world.tscn"
-## Only the fixture checks need the obstacle course.
+## Every mode runs on the graybox: foot measurements need open *flat* ground,
+## and since Phase 4 the world scene is dunes. The graybox's west edge is a
+## clear 85 m lane with no fixtures on it, and its terrain-less LevelRoot also
+## means the sand hooks stay inert — these numbers measure the movement, not
+## the desert. (verify_terrain.gd --sand measures the desert.)
 const GRAYBOX: String = "res://scenes/world/graybox.tscn"
-## Upwind end of the ground plane: "forward" is -Z, so starting at +Z leaves the
-## whole plane as runway instead of two metres and a cliff.
-const START: Vector3 = Vector3(0.0, 0.5, 20.0)
+## Top of the clear west-edge lane; "forward" is -Z, so starting at +Z leaves
+## the whole lane as runway.
+const START: Vector3 = Vector3(-40.0, 0.5, 40.0)
 const SETTLE_TICKS: int = 90
 const SAMPLE_TICKS: int = 120
 ## A foot counts as planted while it sits in the lowest slice of its own range.
@@ -40,9 +41,7 @@ func _start() -> void:
 
 
 func _run() -> void:
-	var user: PackedStringArray = OS.get_cmdline_user_args()
-	var path: String = GRAYBOX if user.has("--graybox") or user.has("--stairs") else LEVEL
-	var level: Node = (load(path) as PackedScene).instantiate()
+	var level: Node = (load(GRAYBOX) as PackedScene).instantiate()
 	root.add_child(level)
 	await physics_frame
 
