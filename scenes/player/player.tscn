@@ -1,23 +1,14 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scenes/player/player.gd" id="1_player"]
-[ext_resource type="Material" path="res://resources/palette/plaster.tres" id="2_body"]
-[ext_resource type="Material" path="res://resources/palette/accent_gold.tres" id="3_facing"]
+[ext_resource type="PackedScene" uid="uid://bjnccoqc0rir6" path="res://assets/models/player.glb" id="2_model"]
+[ext_resource type="AnimationNodeStateMachine" path="res://scenes/player/player_locomotion.tres" id="3_tree"]
+[ext_resource type="Script" path="res://scenes/player/player_animator.gd" id="4_animator"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 resource_local_to_scene = true
 radius = 0.35
 height = 1.75
-
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
-resource_local_to_scene = true
-material = ExtResource("2_body")
-radius = 0.35
-height = 1.75
-
-[sub_resource type="BoxMesh" id="BoxMesh_facing"]
-material = ExtResource("3_facing")
-size = Vector3(0.2, 0.2, 0.2)
 
 [node name="Player" type="CharacterBody3D"]
 collision_layer = 2
@@ -30,10 +21,10 @@ script = ExtResource("1_player")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.875, 0)
 shape = SubResource("CapsuleShape3D_body")
 
-[node name="Body" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.875, 0)
-mesh = SubResource("CapsuleMesh_body")
+[node name="Visual" parent="." instance=ExtResource("2_model")]
 
-[node name="FacingMarker" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.35, -0.32)
-mesh = SubResource("BoxMesh_facing")
+[node name="AnimationTree" type="AnimationTree" parent="."]
+tree_root = ExtResource("3_tree")
+anim_player = NodePath("../Visual/AnimationPlayer")
+callback_mode_process = 1
+script = ExtResource("4_animator")

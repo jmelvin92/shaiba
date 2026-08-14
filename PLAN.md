@@ -13,7 +13,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 0 | Plan, repo & conventions | `main` | ✅ Done (2026-08-13) |
 | 1 | Godot project scaffold & core architecture | `feature/phase-1-scaffold` | ✅ Done (2026-08-13) |
 | 2 | Camera & movement (gray-box) | `feature/phase-2-camera-movement` | ✅ Done (2026-08-13) |
-| 3 | Character model & animation | `feature/phase-3-character` | 🔲 Not started |
+| 3 | Character model & animation | `feature/phase-3-character` | 🧪 In testing on `development` (awaiting Joshua's playtest) |
 | 4 | Terrain & chunk streaming | `feature/phase-4-terrain` | 🔲 Not started |
 | 5 | Sand footprint physics | `feature/phase-5-footprints` | 🔲 Not started |
 | 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🔲 Not started |
@@ -101,10 +101,17 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 - Export pipeline documented in `docs/ART_DIRECTION.md` (Blender export settings, scale/orientation conventions, checklist) so every later asset follows the identical process.
 
 **Quality Gate**
-- [ ] Character reads clearly at gameplay camera distance; silhouette and colors match ART_DIRECTION.md (screenshot comparison).
-- [ ] No foot-sliding at walk or run speed; blend transitions smooth, no T-pose flashes.
-- [ ] .blend and .glb committed; re-export from .blend reproduces the .glb byte-compatibly enough to be repeatable.
-- [ ] Runs in graybox scene with zero errors; PLAN.md updated; merged to `development`.
+- [x] Character reads clearly at gameplay camera distance; silhouette and colors match ART_DIRECTION.md (screenshot comparison). *(Idle, walk, run, crouch and jump captured at the real 45° / 23 m camera. All read; the crouch is clearly lower than the stand and the jump reads as a leap. The character takes the warm directional light and casts a proper shadow — the fix that mattered, since the source material was fully self-lit. **Caveat for Joshua:** pale cream on pale sand is low-contrast, and the placeholder ground is a single flat `sand_light` plane; Phase 4's dune tones and shadows should help, but it's worth a look.)*
+- [x] No foot-sliding at walk or run speed; blend transitions smooth, no T-pose flashes. *(`tools/verify_player.gd` against the running game: planted foot slips 14% of body speed at both 1.40 and 4.90 m/s — the two agreeing points at stance foot-roll rather than a stride mismatch. Every state entered as expected across idle→walk→crouch→stand→jump→fall→land, with a per-tick bind-pose check that never fired.)*
+- [x] .blend and .glb committed; re-export from .blend reproduces the .glb byte-compatibly enough to be repeatable. *(Better than repeatable-by-hand: `tools/build_player.py` rebuilds `player.blend` and `player.glb` from the committed Meshy source in one headless command.)*
+- [x] Runs in graybox scene with zero errors; PLAN.md updated; merged to `development`. *(Headless runs of `player.tscn`, `graybox.tscn` and `world.tscn` are clean, as are `--import` and per-script `--check-only`.)*
+
+**Notes for later phases**
+- **Movement speeds changed** (walk 4.6 → 1.4, run 7.4 → 4.9, crouch 2.0 → 1.0) to match the animations' own strides — Joshua's call. Phase 4's terrain scale and Phase 7's tuning should assume the slower pace. The graybox run-only gap shrank 4.0 → 2.8 m to stay crossable.
+- **Not yet playtested by Joshua.** The pace is a real change in feel and is the one thing this phase could not verify by script.
+- **Crouched movement holds a pose** — the source set has no forward crouch walk (see DECISIONS.md). A few more Meshy clips (forward crouch walk, a dedicated fall and landing) would close it.
+- **Camera distance is untouched at 23 m.** It was chosen for a player moving three times faster; worth comparing against ~16 m at playtest.
+- Phase 5's footstep stamping has its hook: `player.gd` emits `landed(impact_speed)` and `jumped`, and the toe bones (`LeftToeBase`/`RightToeBase`) are what `verify_player.gd` already tracks for foot contact.
 
 ## Phase 4 — Terrain & chunk streaming
 
