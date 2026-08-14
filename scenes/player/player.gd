@@ -29,16 +29,16 @@ const STEP_CLEARANCE: float = 0.02
 @export_range(1.0, 16.0, 0.1) var run_speed: float = 4.9
 ## How hard the player is pushed toward the target speed (m/s²).
 ## Lower = more weight.
-@export_range(1.0, 100.0, 0.5) var acceleration: float = 8.0
+@export_range(1.0, 100.0, 0.5) var acceleration: float = 12.0
 ## How hard the player is slowed when there is no input (m/s²).
-@export_range(1.0, 100.0, 0.5) var friction: float = 12.0
+@export_range(1.0, 100.0, 0.5) var friction: float = 14.0
 ## Turn smoothing toward the move direction (higher = snappier, less drift).
 @export_range(1.0, 40.0, 0.5) var turn_speed: float = 7.0
 ## How much of the acceleration is lost while the body is still turned away
 ## from where you asked it to go. 0 = none (you change direction as fast as you
 ## can press), 1 = no thrust at all until the body has come round. This is what
 ## gives a sudden reversal its weight; the visible turn alone would not.
-@export_range(0.0, 1.0, 0.05) var turn_drag: float = 0.55
+@export_range(0.0, 1.0, 0.05) var turn_drag: float = 0.45
 
 @export_group("Air")
 ## Peak height of a full jump, metres. Converted to a launch velocity against

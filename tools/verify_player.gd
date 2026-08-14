@@ -61,6 +61,10 @@ func _run() -> void:
 		await _sweep()
 		quit()
 		return
+	if OS.get_cmdline_user_args().has("--feel"):
+		await _feel()
+		quit()
+		return
 	if OS.get_cmdline_user_args().has("--stairs"):
 		await _stairs()
 		quit()
@@ -89,6 +93,56 @@ func _run() -> void:
 		for line: String in _failures:
 			print("FAIL  %s" % line)
 	quit(0 if _failures.is_empty() else 1)
+
+
+## Times how quickly the character answers the controls, so "feels heavy" can
+## be tuned against numbers rather than impressions.
+func _feel() -> void:
+	var tick: float = 1.0 / float(Engine.physics_ticks_per_second)
+	print("acceleration %.1f   friction %.1f   turn_drag %.2f   turn_speed %.1f" % [
+		_player.acceleration, _player.friction, _player.turn_drag, _player.turn_speed])
+
+	for sprint: bool in [false, true]:
+		var target: float = _player.run_speed if sprint else _player.walk_speed
+		var label: String = "run" if sprint else "walk"
+
+		await _reset()
+		Input.action_press("move_up")
+		if sprint:
+			Input.action_press("sprint")
+		var launch: int = 0
+		while launch < 200 and _player.get_planar_speed() < target * 0.9:
+			await physics_frame
+			launch += 1
+
+		# Now let go and see how long it takes to come to rest.
+		_release()
+		var stop: int = 0
+		while stop < 200 and _player.get_planar_speed() > 0.05:
+			await physics_frame
+			stop += 1
+		print("%-5s to 90%% of %.1f m/s: %.2f s     to a standstill: %.2f s" % [
+			label, target, launch * tick, stop * tick])
+
+	# A full reversal: run one way, then demand the opposite and time how long
+	# until the body is actually moving back at speed. This is what turn_drag
+	# governs, and it is where weight is felt most.
+	await _reset()
+	Input.action_press("move_up")
+	for i: int in range(90):
+		await physics_frame
+	var facing_before: Vector3 = -_player.global_basis.z
+	_release()
+	Input.action_press("move_down")
+	var turn: int = 0
+	while turn < 240:
+		await physics_frame
+		turn += 1
+		var facing: Vector3 = -_player.global_basis.z
+		if facing.dot(facing_before) < -0.9 and _player.get_planar_speed() > _player.walk_speed * 0.9:
+			break
+	print("180 degree reversal, back up to speed: %.2f s" % (turn * tick))
+	_release()
 
 
 ## Traces the body's height while it climbs the 0.25 m staircase, so a stair
