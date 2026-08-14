@@ -94,6 +94,11 @@ signal landed(impact_speed: float)
 ## means "away from the camera".
 var view_yaw: float = 0.0
 
+## Terrain query source for the deep-sand movement hooks, handed in by the
+## level. Stays null on levels without terrain (the graybox), which turns
+## every sand effect into a no-op.
+var _terrain: TerrainSettings = null
+
 @onready var _collision: CollisionShape3D = $Collision
 @onready var _capsule: CapsuleShape3D = _collision.shape
 @onready var _animator: PlayerAnimator = $AnimationTree
@@ -133,6 +138,11 @@ func _ready() -> void:
 ## Called by the level that owns both this player and the camera rig.
 func set_view_yaw(yaw: float) -> void:
 	view_yaw = yaw
+
+
+## Called by a level that has terrain, so movement can feel the sand depth.
+func set_terrain(terrain: TerrainSettings) -> void:
+	_terrain = terrain
 
 
 func _physics_process(delta: float) -> void:
