@@ -34,11 +34,11 @@ signal yaw_changed(yaw: float)
 
 @export_group("Zoom")
 ## Starting distance from the framed point, metres.
-@export_range(4.0, 40.0, 0.5) var zoom_distance: float = 18.0
+@export_range(4.0, 40.0, 0.5) var zoom_distance: float = 23.0
 ## Closest the player may zoom in.
 @export_range(4.0, 40.0, 0.5) var zoom_min: float = 9.0
 ## Furthest the player may pull back.
-@export_range(4.0, 40.0, 0.5) var zoom_max: float = 28.0
+@export_range(4.0, 40.0, 0.5) var zoom_max: float = 34.0
 ## Distance added or removed per scroll notch.
 @export_range(0.1, 10.0, 0.1) var zoom_step: float = 1.5
 ## Damping of the zoom transition.
@@ -62,11 +62,11 @@ signal yaw_changed(yaw: float)
 
 var _target: Node3D = null
 ## Where the player has zoomed to, before obstruction is considered.
-var _zoom_goal: float = 18.0
+var _zoom_goal: float = 23.0
 ## Smoothed follower of [member _zoom_goal].
-var _zoom_current: float = 18.0
+var _zoom_current: float = 23.0
 ## Distance the camera is actually at this tick.
-var _distance: float = 18.0
+var _distance: float = 23.0
 
 
 func _ready() -> void:
