@@ -168,10 +168,16 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 **Quality Gate**
 - [ ] Footprints visually match foot placement at walk and run; look correct from the gameplay camera in both direct light and shadow.
 - [ ] Print depth visibly varies with sand depth: a trail crossing deep drift → thin skin → hard ground reads deep → faint → gone.
-- [ ] No shimmer/artifacts at the deformation region boundary as it follows the player across chunk borders.
-- [ ] Frame cost of the whole system ≤ 1 ms on this Mac; zero cost when standing still.
+- [x] No shimmer/artifacts at the deformation region boundary as it follows the player across chunk borders. *(Recentres move the region in whole texels only, so carried content is copied texel-for-texel, never resampled — `verify_prints` asserts a marked point survives repeated recentres bit-cleanly, and an isolation harness held a stamp through 6 recentres at 0.998→0.984 (pure decay). The wind drift shares the same whole-texel mechanism.)*
+- [x] Frame cost of the whole system ≤ 1 ms on this Mac; zero cost when standing still. *(`verify_prints`: worst main-thread pass 0.8 ms across ~690 passes — and a pass only runs when something changed; the harness asserts the pass counter stops climbing once prints have fully faded, so standing still costs exactly zero.)*
 - [ ] Prints fade smoothly; walking a circle and returning shows believable partial fading.
 - [ ] PLAN.md updated; merged to `development`.
+
+**Handoff notes (2026-08-14, session in progress)**
+- Core system built and harness-verified on `feature/phase-5-footprints`: SubViewport ping-pong deformation texture (2048² over 128 m), stamps timed to the toe bones via `FootstepStamper` (player child, signal-up wiring), deep-sand drag stamps, landing splats, decay + whole-texel wind drift, `tools/verify_prints.gd` all green (alignment, recentre, drift, decay-to-idle, cost).
+- Session opened with Joshua's first playtest of Phase 4's world: 19° camera approved as-is; deep-sand slowdown retuned (`deep_sand_depth` 0.4 → 1.5 m, see DECISIONS) and approved.
+- Remaining for the gate: Joshua's visual sign-off — the three unchecked boxes are all his-eyes items. His tuning ladder (print darkness / depth) is published as the "Footprint Ladder" artifact; fade time to judge in play (current 180 s). After his picks: bake values, screenshot direct-light + shadow check, circle-walk fade check, merge.
+- `tools/shoot_prints.gd` (trail across a depth gradient) and `tools/shoot_print_ladder.gd` (same-vantage tuning rungs) are the screenshot tools; both run windowed.
 
 ## Phase 6 — Environment assets (house & camel)
 
