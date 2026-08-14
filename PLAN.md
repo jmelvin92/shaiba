@@ -15,7 +15,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 2 | Camera & movement (gray-box) | `feature/phase-2-camera-movement` | ✅ Done (2026-08-13) |
 | 3 | Character model & animation | `feature/phase-3-character` | ✅ Done (2026-08-13) |
 | 4 | Terrain & chunk streaming | `feature/phase-4-terrain` | ✅ Done (2026-08-13) |
-| 5 | Sand footprint physics | `feature/phase-5-footprints` | 🔲 Not started |
+| 5 | Sand footprint physics | `feature/phase-5-footprints` | 🟡 In progress (2026-08-14) |
 | 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🔲 Not started |
 | 7 | Integration & polish → v0.1 | `feature/phase-7-polish` | 🔲 Not started |
 

@@ -88,7 +88,7 @@ const STEP_CLEARANCE: float = 0.02
 @export_group("Sand")
 ## Sand depth at which the deep-sand effects reach full strength, metres.
 ## Shallower sand scales every effect down proportionally.
-@export_range(0.05, 2.0, 0.05) var deep_sand_depth: float = 0.4
+@export_range(0.05, 2.0, 0.05) var deep_sand_depth: float = 1.5
 ## Multiplier on movement speed when the sand is fully deep — wading through
 ## a dune should cost something.
 @export_range(0.2, 1.0, 0.05) var deep_sand_speed_scale: float = 0.6
