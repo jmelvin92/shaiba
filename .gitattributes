@@ -1,0 +1,14 @@
+# Normalize line endings for text files
+* text=auto eol=lf
+
+# Binary assets — never diff or normalize
+*.blend binary
+*.glb binary
+*.gltf binary
+*.png binary
+*.jpg binary
+*.hdr binary
+*.exr binary
+*.ttf binary
+*.wav binary
+*.ogg binary
