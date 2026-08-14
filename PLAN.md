@@ -50,7 +50,7 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 **Deliverables**
 - `project.godot` (Godot 4.7.1, Forward+, project name "Shaiba"), window/stretch settings sensible for desktop.
 - Folder structure created exactly as in `docs/ARCHITECTURE.md` (feature folders under `scenes/`, `autoload/`, `resources/`, `shaders/`, `assets/`).
-- Input map defined in project settings: `move_up/down/left/right` (WASD + arrows), `interact` (E) — even if unused yet.
+- Input map defined in project settings: `move_up/down/left/right` (WASD + arrows), `interact` (E) — even if unused yet. *(Phase 2 added `sprint` (shift) and `camera_zoom_in/out` (wheel).)*
 - Palette as a Godot resource: `resources/palette/` with named `StandardMaterial3D` .tres files for every color in ART_DIRECTION.md (flat-shaded: roughness 1.0, no metallic).
 - One autoload only for now: `autoload/game.gd` (`Game`) — holds world seed + will grow into pause/state later. No premature managers.
 - `scenes/world/world.tscn` main scene: DirectionalLight3D (warm, angled like late afternoon), WorldEnvironment with the sky/ambient colors from ART_DIRECTION.md, and a temporary 50×50 m flat ground plane using the sand material.
@@ -94,7 +94,7 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 **Deliverables**
 - Low-poly desert traveler modeled in Blender (via blender-mcp): head-wrap/keffiyeh, loose robes — palette colors only, target ≤ 2,500 tris. Source: `assets/blender/player.blend`; export: `assets/models/player.glb`.
 - Simple rig + three animations minimum: `idle`, `walk`, `run`. Root motion NOT used — animation speed matched to movement speed in code.
-- `AnimationTree` with a state machine (idle↔walk↔run blended by speed) driven from `player.gd`.
+- `AnimationTree` with a state machine (idle↔walk↔run blended by speed) driven from `player.gd`. **The input side already exists from Phase 2**: holding shift (`sprint`) raises the target speed from `walk_speed` 4.6 to `run_speed` 7.4, so blend off the player's planar speed — not off the input — and the blend stays correct while winding up, on slopes, and mid-turn.
 - Export pipeline documented in `docs/ART_DIRECTION.md` (Blender export settings, scale/orientation conventions, checklist) so every later asset follows the identical process.
 
 **Quality Gate**

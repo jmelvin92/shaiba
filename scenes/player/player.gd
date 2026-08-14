@@ -4,16 +4,21 @@ extends CharacterBody3D
 ##
 ## Camera-relative 8-way movement with acceleration/friction (no instant
 ## start-stop), gentle turning toward the move direction, gravity, and small
-## step climbing so stairs and thresholds don't catch the capsule.
+## step climbing so stairs and thresholds don't catch the capsule. Holding
+## shift runs; Phase 3's animation tree blends idle/walk/run off the resulting
+## planar speed, so the two gaits are speeds here, not states.
 ##
 ## The controller never looks up the tree for the camera. Whoever owns the
 ## level tells it which way "up the screen" is via [method set_view_yaw].
 ## Tuning values and the reasoning behind them are in docs/DECISIONS.md.
 
 @export_group("Movement")
-## Top planar speed, metres per second. Walking pace for a 1.75 m character.
-@export_range(1.0, 12.0, 0.1) var max_speed: float = 4.6
-## How hard the player is pushed toward max_speed (m/s²). Lower = more weight.
+## Default pace, metres per second. A brisk walk for a 1.75 m character.
+@export_range(1.0, 12.0, 0.1) var walk_speed: float = 4.6
+## Pace while the sprint key (shift) is held.
+@export_range(1.0, 16.0, 0.1) var run_speed: float = 7.4
+## How hard the player is pushed toward the target speed (m/s²).
+## Lower = more weight.
 @export_range(1.0, 100.0, 0.5) var acceleration: float = 16.0
 ## How hard the player is slowed when there is no input (m/s²).
 @export_range(1.0, 100.0, 0.5) var friction: float = 24.0
@@ -62,10 +67,11 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity += get_gravity() * gravity_scale * delta
 
+	var target_speed: float = run_speed if Input.is_action_pressed("sprint") else walk_speed
 	var planar: Vector3 = Vector3(velocity.x, 0.0, velocity.z)
 	if direction.length_squared() > 0.0:
 		planar = planar.move_toward(
-			direction * max_speed, acceleration * _turn_thrust(direction) * delta
+			direction * target_speed, acceleration * _turn_thrust(direction) * delta
 		)
 		_face_direction(direction, delta)
 	else:
