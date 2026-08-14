@@ -10,6 +10,8 @@ extends SceneTree
 ## Foot measurements need open flat ground; graybox is full of things to trip
 ## over, and a player who leaves the floor makes every frame look "planted".
 const LEVEL: String = "res://scenes/world/world.tscn"
+## Only the fixture checks need the obstacle course.
+const GRAYBOX: String = "res://scenes/world/graybox.tscn"
 ## Upwind end of the ground plane: "forward" is -Z, so starting at +Z leaves the
 ## whole plane as runway instead of two metres and a cliff.
 const START: Vector3 = Vector3(0.0, 0.5, 20.0)
@@ -38,7 +40,8 @@ func _start() -> void:
 
 
 func _run() -> void:
-	var level: Node = (load(LEVEL) as PackedScene).instantiate()
+	var path: String = GRAYBOX if OS.get_cmdline_user_args().has("--graybox") else LEVEL
+	var level: Node = (load(path) as PackedScene).instantiate()
 	root.add_child(level)
 	await physics_frame
 
@@ -57,6 +60,15 @@ func _run() -> void:
 		await _sweep()
 		quit()
 		return
+	if OS.get_cmdline_user_args().has("--graybox"):
+		await _graybox()
+		print("\n=== result ===")
+		for line: String in _failures:
+			print("FAIL  %s" % line)
+		if _failures.is_empty():
+			print("all checks passed")
+		quit(0 if _failures.is_empty() else 1)
+		return
 
 	print("=== foot sliding ===")
 	await _gait("walk", false)
@@ -72,6 +84,67 @@ func _run() -> void:
 		for line: String in _failures:
 			print("FAIL  %s" % line)
 	quit(0 if _failures.is_empty() else 1)
+
+
+## Re-checks the graybox fixtures that the new, slower movement speeds affect:
+## the run-only gap (resized for the shorter jump) and the crouch tunnel.
+func _graybox() -> void:
+	print("=== graybox fixtures ===")
+
+	# The gap runs from z 20.5 to z 23.3, between two 0.9 m platforms.
+	for sprint: bool in [true, false]:
+		await _place(Vector3(6.0, 1.1, 17.0))
+		Input.action_press("move_down")
+		if sprint:
+			Input.action_press("sprint")
+		var jumped: bool = false
+		var crossed: bool = false
+		var reached: Vector3 = _player.global_position
+		for i: int in range(200):
+			if not jumped and _player.global_position.z > 19.9 and _player.is_on_floor():
+				Input.action_press("jump")
+				jumped = true
+			# Landing on the far platform is the pass condition. Testing only
+			# the final position misses it, because a runner that clears the
+			# gap keeps going and jogs off the far end onto the ground.
+			if _player.global_position.z > 23.6 and _player.global_position.y > 0.5:
+				crossed = true
+				reached = _player.global_position
+				break
+			await physics_frame
+		print("  gap %-8s -> %s (%s at z %.1f, y %.1f)" % [
+			"running" if sprint else "walking",
+			"crossed" if crossed else "fell short",
+			"landed" if crossed else "ended",
+			reached.z if crossed else _player.global_position.z,
+			reached.y if crossed else _player.global_position.y])
+		if sprint and not crossed:
+			_failures.append("the run-only gap can no longer be cleared at run speed")
+		if not sprint and crossed:
+			_failures.append("the run-only gap can be cleared at walk speed")
+		_release()
+
+	# The tunnel's lintel sits at 1.30 m; a crouched traveler is 1.19 m tall.
+	await _place(Vector3(30.0, 0.5, 14.5))
+	Input.action_press("crouch")
+	Input.action_press("move_up")
+	var entered: float = _player.global_position.z
+	for i: int in range(300):
+		await physics_frame
+	var travelled: float = entered - _player.global_position.z
+	print("  crouch tunnel -> travelled %.1f m under the lintel" % travelled)
+	if travelled < 3.0:
+		_failures.append("crouching player got stuck in the tunnel (%.1f m)" % travelled)
+	_release()
+
+
+func _place(where: Vector3) -> void:
+	_release()
+	_player.velocity = Vector3.ZERO
+	_player.global_position = where
+	_player.reset_physics_interpolation()
+	for i: int in range(30):
+		await physics_frame
 
 
 ## Finds a clip's true stride speed by pinning the blend to that clip alone and
