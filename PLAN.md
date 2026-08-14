@@ -13,7 +13,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 0 | Plan, repo & conventions | `main` | ✅ Done (2026-08-13) |
 | 1 | Godot project scaffold & core architecture | `feature/phase-1-scaffold` | ✅ Done (2026-08-13) |
 | 2 | Camera & movement (gray-box) | `feature/phase-2-camera-movement` | ✅ Done (2026-08-13) |
-| 3 | Character model & animation | `feature/phase-3-character` | 🔲 Not started |
+| 3 | Character model & animation | `feature/phase-3-character` | 🟡 In progress |
 | 4 | Terrain & chunk streaming | `feature/phase-4-terrain` | 🔲 Not started |
 | 5 | Sand footprint physics | `feature/phase-5-footprints` | 🔲 Not started |
 | 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🔲 Not started |
