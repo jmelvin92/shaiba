@@ -5,23 +5,28 @@ extends CharacterBody3D
 ## Camera-relative 8-way movement with acceleration/friction (no instant
 ## start-stop), gentle turning toward the move direction, gravity, and small
 ## step climbing so stairs and thresholds don't catch the capsule. Holding
-## shift runs; Phase 3's animation tree blends idle/walk/run off the resulting
-## planar speed, so the two gaits are speeds here, not states.
+## shift runs; the animation tree blends idle/walk/run off the resulting planar
+## speed, so the two gaits are speeds here, not states.
+##
+## This script knows nothing about clips or blending. It reports its own state
+## down to the [PlayerAnimator] child once a tick, and that node decides what
+## the character should look like.
 ##
 ## The controller never looks up the tree for the camera. Whoever owns the
 ## level tells it which way "up the screen" is via [method set_view_yaw].
 ## Tuning values and the reasoning behind them are in docs/DECISIONS.md.
 
 @export_group("Movement")
-## Default pace, metres per second. A brisk walk for a 1.75 m character.
-@export_range(1.0, 12.0, 0.1) var walk_speed: float = 4.6
-## Pace while the sprint key (shift) is held.
-@export_range(1.0, 16.0, 0.1) var run_speed: float = 7.4
+## Default pace, metres per second. Matched to the walk animation's own stride
+## so the feet don't skate — see PlayerAnimator.WALK_SPEED.
+@export_range(0.5, 12.0, 0.1) var walk_speed: float = 1.4
+## Pace while the sprint key (shift) is held. Matched to the run animation.
+@export_range(1.0, 16.0, 0.1) var run_speed: float = 4.9
 ## How hard the player is pushed toward the target speed (m/s²).
 ## Lower = more weight.
-@export_range(1.0, 100.0, 0.5) var acceleration: float = 16.0
+@export_range(1.0, 100.0, 0.5) var acceleration: float = 8.0
 ## How hard the player is slowed when there is no input (m/s²).
-@export_range(1.0, 100.0, 0.5) var friction: float = 24.0
+@export_range(1.0, 100.0, 0.5) var friction: float = 12.0
 ## Turn smoothing toward the move direction (higher = snappier, less drift).
 @export_range(1.0, 40.0, 0.5) var turn_speed: float = 7.0
 ## How much of the acceleration is lost while the body is still turned away
@@ -46,8 +51,9 @@ extends CharacterBody3D
 @export_range(0.0, 1.0, 0.05) var air_control: float = 0.35
 
 @export_group("Crouch")
-## Pace while crouched.
-@export_range(0.5, 6.0, 0.1) var crouch_speed: float = 2.0
+## Pace while crouched. Kept slow because the source animation set has no
+## forward crouch walk, so crouched movement holds a pose.
+@export_range(0.5, 6.0, 0.1) var crouch_speed: float = 1.0
 ## Capsule height when crouched. Standing height is read from the scene.
 @export_range(0.6, 2.0, 0.05) var crouch_height: float = 1.15
 ## How quickly the capsule shrinks and grows again.
@@ -63,15 +69,18 @@ extends CharacterBody3D
 ## Multiplier on project gravity. > 1 keeps the fall from feeling floaty.
 @export_range(0.0, 5.0, 0.1) var gravity_scale: float = 1.4
 
+## Emitted the moment a jump actually launches, not when the key is pressed.
+signal jumped
+## Emitted on touchdown, carrying the downward speed at impact in m/s.
+signal landed(impact_speed: float)
+
 ## Yaw of the viewing camera, radians. Input is rotated by this so "W" always
 ## means "away from the camera".
 var view_yaw: float = 0.0
 
 @onready var _collision: CollisionShape3D = $Collision
-@onready var _body: MeshInstance3D = $Body
-@onready var _facing_marker: MeshInstance3D = $FacingMarker
 @onready var _capsule: CapsuleShape3D = _collision.shape
-@onready var _capsule_mesh: CapsuleMesh = _body.mesh
+@onready var _animator: PlayerAnimator = $AnimationTree
 
 ## Full standing capsule height, taken from the scene at load.
 var _stand_height: float = 1.75
@@ -82,6 +91,13 @@ var _crouched: bool = false
 var _coyote_left: float = 0.0
 ## Counts down after a jump press; spends itself the moment a jump is possible.
 var _jump_buffer_left: float = 0.0
+## Horizontal speed at the end of the last tick, m/s. Cached because the
+## animation blends off the speed the body actually reached, not off the input.
+var _planar_speed: float = 0.0
+var _was_on_floor: bool = true
+## velocity.y captured before move_and_slide, so a landing can report the speed
+## it arrived at rather than the zero it has afterwards.
+var _fall_speed: float = 0.0
 
 
 func _ready() -> void:
@@ -123,10 +139,21 @@ func _physics_process(delta: float) -> void:
 		planar = planar.move_toward(Vector3.ZERO, friction * control * delta)
 	velocity.x = planar.x
 	velocity.z = planar.z
+	_planar_speed = planar.length()
 
 	if is_on_floor():
 		_try_step_up(planar)
+	_fall_speed = maxf(-velocity.y, 0.0)
 	move_and_slide()
+
+	# is_on_floor() only means anything after move_and_slide, so the touchdown
+	# test has to come after it.
+	var grounded: bool = is_on_floor()
+	if grounded and not _was_on_floor:
+		_animator.play_land(_fall_speed)
+		landed.emit(_fall_speed)
+	_was_on_floor = grounded
+	_animator.set_locomotion(_planar_speed, grounded, _crouched)
 
 
 ## The pace being asked for: crouching beats sprinting, sprinting beats walking.
@@ -143,9 +170,14 @@ func is_crouching() -> bool:
 	return _crouched
 
 
+## Horizontal speed reached on the last tick, m/s.
+func get_planar_speed() -> float:
+	return _planar_speed
+
+
 ## Follows the crouch key, except that you cannot stand up under something.
-## The capsule resizes toward the target height rather than snapping, and the
-## collision shape and mesh are kept sitting on the character's feet.
+## The capsule resizes toward the target height rather than snapping, and is
+## kept sitting on the character's feet.
 func _update_crouch(delta: float) -> void:
 	if Input.is_action_pressed("crouch"):
 		_crouched = true
@@ -169,13 +201,11 @@ func _has_standing_room() -> bool:
 	return not test_move(global_transform, Vector3.UP * needed)
 
 
+## Only the collider changes shape. The crouched silhouette comes from the
+## crouch animation, so there is no mesh left to keep in sync with it.
 func _apply_height(height: float) -> void:
 	_capsule.height = height
-	_capsule_mesh.height = height
 	_collision.position.y = height * 0.5
-	_body.position.y = height * 0.5
-	# Keep the facing marker at the same fraction of the body's height.
-	_facing_marker.position.y = height * 0.771
 
 
 ## Jump with the two forgivenesses players never notice until they are missing:
@@ -196,6 +226,8 @@ func _update_jump(delta: float) -> void:
 		velocity.y = sqrt(2.0 * get_gravity().length() * gravity_scale * jump_height)
 		_jump_buffer_left = 0.0
 		_coyote_left = 0.0
+		_animator.play_jump()
+		jumped.emit()
 	elif Input.is_action_just_released("jump") and velocity.y > 0.0:
 		# Released mid-rise — cut it short once, so a tap is a smaller hop.
 		velocity.y *= jump_release_damping

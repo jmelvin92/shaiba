@@ -1,0 +1,86 @@
+[gd_resource type="AnimationNodeStateMachine" load_steps=15 format=3]
+
+; Player animation state machine. Driven from player_animator.gd via travel();
+; only the two clip-end transitions advance by themselves.
+;
+; The ground and crouch states are blend spaces whose anchors sit at each
+; clip's measured natural ground speed (tools/measure_gaits.gd). Because idle
+; is anchored at 0, blending it with walk scales the stride in proportion, so
+; the blended pose's own ground speed always equals the blend position. That
+; is what keeps the feet from skating without any playback-rate correction.
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_idle"]
+animation = &"idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_walk"]
+animation = &"walk"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_run"]
+animation = &"run"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_crouch_idle"]
+animation = &"crouch_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_crouch_walk"]
+animation = &"crouch_walk"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_jump"]
+animation = &"jump"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_fall"]
+animation = &"fall"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_land"]
+animation = &"land"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_ground"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_idle")
+blend_point_0/pos = 0.0
+blend_point_1/node = SubResource("AnimationNodeAnimation_walk")
+blend_point_1/pos = 1.4
+blend_point_2/node = SubResource("AnimationNodeAnimation_run")
+blend_point_2/pos = 4.9
+max_space = 4.9
+value_label = "speed"
+sync = true
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_crouch"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_crouch_idle")
+blend_point_0/pos = 0.0
+blend_point_1/node = SubResource("AnimationNodeAnimation_crouch_walk")
+blend_point_1/pos = 1.0
+max_space = 1.0
+value_label = "speed"
+sync = true
+
+; Standing <-> crouching keeps the stride phase, so the feet do not jump to a
+; different point in the cycle as the character ducks.
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_soft"]
+xfade_time = 0.15
+switch_mode = 1
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_quick"]
+xfade_time = 0.08
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_air"]
+xfade_time = 0.15
+
+; Runs the clip out, then advances on its own.
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_atend"]
+xfade_time = 0.12
+switch_mode = 2
+advance_mode = 2
+
+[resource]
+states/crouch/node = SubResource("AnimationNodeBlendSpace1D_crouch")
+states/crouch/position = Vector2(400, 260)
+states/fall/node = SubResource("AnimationNodeAnimation_fall")
+states/fall/position = Vector2(680, 100)
+states/jump/node = SubResource("AnimationNodeAnimation_jump")
+states/jump/position = Vector2(540, 100)
+states/land/node = SubResource("AnimationNodeAnimation_land")
+states/land/position = Vector2(820, 100)
+states/locomotion/node = SubResource("AnimationNodeBlendSpace1D_ground")
+states/locomotion/position = Vector2(400, 180)
+transitions = ["Start", "locomotion", SubResource("AnimationNodeStateMachineTransition_quick"), "locomotion", "crouch", SubResource("AnimationNodeStateMachineTransition_soft"), "crouch", "locomotion", SubResource("AnimationNodeStateMachineTransition_soft"), "locomotion", "jump", SubResource("AnimationNodeStateMachineTransition_quick"), "crouch", "jump", SubResource("AnimationNodeStateMachineTransition_quick"), "locomotion", "fall", SubResource("AnimationNodeStateMachineTransition_air"), "crouch", "fall", SubResource("AnimationNodeStateMachineTransition_air"), "jump", "fall", SubResource("AnimationNodeStateMachineTransition_atend"), "jump", "locomotion", SubResource("AnimationNodeStateMachineTransition_air"), "fall", "land", SubResource("AnimationNodeStateMachineTransition_quick"), "fall", "locomotion", SubResource("AnimationNodeStateMachineTransition_air"), "fall", "crouch", SubResource("AnimationNodeStateMachineTransition_air"), "land", "locomotion", SubResource("AnimationNodeStateMachineTransition_atend"), "land", "crouch", SubResource("AnimationNodeStateMachineTransition_quick")]
+graph_offset = Vector2(200, 40)
