@@ -19,7 +19,7 @@ autoload/
   game.gd                    # `Game` singleton: world seed, top-level state. Keep small.
 scenes/
   player/                    # player.tscn, player.gd (+ later: footstep_stamper.gd …)
-  camera/                    # camera_rig.tscn, camera_rig.gd
+  camera/                    # camera_rig.tscn, camera_rig.gd, occluder_fader.gd
   world/
     world.tscn               # main scene: environment, terrain, spawns player+camera
     graybox.tscn             # permanent movement-test level (Phase 2)
@@ -65,5 +65,6 @@ Both playable level scenes (`world.tscn`, `graybox.tscn`) use `LevelRoot` as the
 
 ## Physics conventions
 
-- **Collision layers:** 1 = world/terrain (and every static prop), 2 = player. The camera's obstruction cast masks layer 1 only, so it is never blocked by the player it frames.
+- **Collision layers:** 1 = world/terrain (and every static prop), 2 = player, 3 = *fadeable occluder*. Anything that should turn see-through when it hides the player sits on layers 1 **and** 3 (`collision_layer = 5`); terrain stays on layer 1 alone so it can never fade out from under the character. The player is on layer 2 by itself and masks layer 1.
+- **The camera never moves to avoid geometry.** `scenes/camera/occluder_fader.gd`, a child of the camera rig, fades whatever is in the way instead. Give every new prop `collision_layer = 5` unless it is terrain.
 - **Physics interpolation is on project-wide.** Anything that moves does so in `_physics_process`, never `_process`, so gameplay nodes share one 60 Hz tick and interpolation smooths them to the render rate together. Code that teleports a node must call `reset_physics_interpolation()`.

@@ -4,8 +4,9 @@ extends Node3D
 ##
 ## Perspective camera, pitched ~52° down with a narrow FOV — see the fixed
 ## decision in docs/DECISIONS.md. The rig follows a target position with
-## damping, ducks toward the player when something solid is in the way, and
-## zooms on the scroll wheel between clamps.
+## damping and zooms on the scroll wheel between clamps. It deliberately does
+## NOT move to avoid geometry: anything blocking the view is faded instead, by
+## the OccluderFader child. See docs/DECISIONS.md.
 ##
 ## The rig never searches the tree for its target: whoever instances it calls
 ## [method set_target]. Everything runs in _physics_process so the camera and
@@ -44,36 +45,22 @@ signal yaw_changed(yaw: float)
 ## Damping of the zoom transition.
 @export_range(1.0, 30.0, 0.5) var zoom_speed: float = 12.0
 
-@export_group("Obstruction")
-## Hard floor on the ducked distance, so the camera can never end up behind the
-## point it is framing. Deliberately small: anything larger would place the
-## camera *past* a close obstruction, i.e. inside it. Pressed against something
-## very tall the view therefore gets cramped — the real fix is fading occluders
-## once the world has tall props to fade. See docs/DECISIONS.md.
-@export_range(0.5, 20.0, 0.5) var min_obstructed_distance: float = 1.0
-## How quickly the camera eases back out once the way is clear. Ducking in is
-## always immediate; only the return is damped.
-@export_range(0.5, 20.0, 0.5) var obstruction_return_speed: float = 3.5
-
 @onready var _yaw_pivot: Node3D = $YawPivot
 @onready var _pitch_pivot: Node3D = $YawPivot/PitchPivot
-@onready var _obstruction: ShapeCast3D = $YawPivot/PitchPivot/Obstruction
 @onready var _camera: Camera3D = $YawPivot/PitchPivot/Camera3D
+@onready var _fader: OccluderFader = $OccluderFader
 
 var _target: Node3D = null
 ## Where the player has zoomed to, before obstruction is considered.
 var _zoom_goal: float = 23.0
-## Smoothed follower of [member _zoom_goal].
+## Smoothed follower of [member _zoom_goal]; also the camera's actual distance.
 var _zoom_current: float = 23.0
-## Distance the camera is actually at this tick.
-var _distance: float = 23.0
 
 
 func _ready() -> void:
 	_zoom_goal = clampf(zoom_distance, zoom_min, zoom_max)
 	_zoom_current = _zoom_goal
-	_distance = _zoom_goal
-	_camera.position.z = _distance
+	_camera.position.z = _zoom_current
 	_apply_pitch()
 	_apply_yaw()
 
@@ -81,6 +68,7 @@ func _ready() -> void:
 ## Sets the node this rig follows and snaps to it immediately.
 func set_target(target: Node3D) -> void:
 	_target = target
+	_fader.setup(_camera, target)
 	snap_to_target()
 
 
@@ -89,15 +77,14 @@ func snap_to_target() -> void:
 	if _target == null:
 		return
 	global_position = _target.global_position + follow_offset
-	_distance = _zoom_current
 	if _camera != null:
-		_camera.position.z = _distance
+		_camera.position.z = _zoom_current
 	reset_physics_interpolation()
 
 
-## Current camera distance in metres, after zoom and obstruction.
+## Current camera distance in metres.
 func get_camera_distance() -> float:
-	return _distance
+	return _zoom_current
 
 
 func get_yaw() -> float:
@@ -120,7 +107,7 @@ func _physics_process(delta: float) -> void:
 	var goal: Vector3 = _target.global_position + follow_offset
 	global_position = global_position.lerp(goal, 1.0 - exp(-follow_speed * delta))
 	_zoom_current = lerpf(_zoom_current, _zoom_goal, 1.0 - exp(-zoom_speed * delta))
-	_update_distance(delta)
+	_camera.position.z = _zoom_current
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -128,25 +115,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		_zoom_goal = clampf(_zoom_goal - zoom_step, zoom_min, zoom_max)
 	elif event.is_action_pressed("camera_zoom_out"):
 		_zoom_goal = clampf(_zoom_goal + zoom_step, zoom_min, zoom_max)
-
-
-## Shape-casts from the framed point out along the camera arm and places the
-## camera at the first clear distance.
-func _update_distance(delta: float) -> void:
-	var wanted: float = _zoom_current
-	_obstruction.target_position = Vector3(0.0, 0.0, wanted)
-	_obstruction.force_shapecast_update()
-	if _obstruction.is_colliding():
-		var clear: float = _obstruction.get_closest_collision_safe_fraction() * wanted
-		wanted = clampf(clear, minf(min_obstructed_distance, _zoom_current), _zoom_current)
-
-	if wanted < _distance:
-		_distance = wanted  # duck in at once, so nothing pops through the lens
-	else:
-		_distance = lerpf(
-			_distance, wanted, 1.0 - exp(-obstruction_return_speed * delta)
-		)
-	_camera.position.z = _distance
 
 
 func _apply_yaw() -> void:

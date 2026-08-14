@@ -1,9 +1,7 @@
 [gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scenes/camera/camera_rig.gd" id="1_rig"]
-
-[sub_resource type="SphereShape3D" id="SphereShape3D_probe"]
-radius = 0.4
+[ext_resource type="Script" path="res://scenes/camera/occluder_fader.gd" id="2_fader"]
 
 [node name="CameraRig" type="Node3D"]
 script = ExtResource("1_rig")
@@ -13,16 +11,12 @@ script = ExtResource("1_rig")
 [node name="PitchPivot" type="Node3D" parent="YawPivot"]
 transform = Transform3D(1, 0, 0, 0, 0.615661, 0.788011, 0, -0.788011, 0.615661, 0, 0, 0)
 
-[node name="Obstruction" type="ShapeCast3D" parent="YawPivot/PitchPivot"]
-shape = SubResource("SphereShape3D_probe")
-target_position = Vector3(0, 0, 23)
-max_results = 1
-collision_mask = 1
-margin = 0.1
-
 [node name="Camera3D" type="Camera3D" parent="YawPivot/PitchPivot"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 23)
 current = true
 fov = 35.0
 near = 0.1
 far = 500.0
+
+[node name="OccluderFader" type="Node" parent="."]
+script = ExtResource("2_fader")
