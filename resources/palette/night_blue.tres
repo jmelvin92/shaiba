@@ -1,0 +1,7 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+[resource]
+resource_name = "night_blue"
+albedo_color = Color(0.203922, 0.270588, 0.368627, 1)
+roughness = 1.0
+metallic = 0.0

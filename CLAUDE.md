@@ -79,6 +79,7 @@ Everything visual obeys `docs/ART_DIRECTION.md` — the fixed color palette (hex
 
 - **`blender`** — `uvx blender-mcp` (ahujasid/blender-mcp). Talks to an addon *inside* Blender that auto-starts a socket server on `127.0.0.1:9876` whenever Blender runs with a GUI. **Blender must be open** for these tools to work: `open -a Blender`. Check with `lsof -nP -iTCP:9876 -sTCP:LISTEN`.
 - **`godot`** — `node ~/tools/godot-mcp/build/index.js` with `GODOT_PATH=/Applications/Godot.app/Contents/MacOS/Godot`. Can create/edit scenes and scripts, launch the editor, run the project, and read debug output.
+  - Quirks (verified Phase 1): works against this project. `run_project` launches in debug mode; call `stop_project` before re-running. `get_debug_output` returns accumulated stdout plus a separate `errors` array — check both. The game window opens *behind* other apps; to screenshot it, first `osascript -e 'tell application "System Events" to set frontmost of (first process whose name contains "Godot") to true'`, then `screencapture -x <file>`.
 
 ## Environment quirks
 

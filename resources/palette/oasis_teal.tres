@@ -1,0 +1,7 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+[resource]
+resource_name = "oasis_teal"
+albedo_color = Color(0.372549, 0.658824, 0.627451, 1)
+roughness = 1.0
+metallic = 0.0
