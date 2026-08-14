@@ -40,7 +40,8 @@ func _start() -> void:
 
 
 func _run() -> void:
-	var path: String = GRAYBOX if OS.get_cmdline_user_args().has("--graybox") else LEVEL
+	var user: PackedStringArray = OS.get_cmdline_user_args()
+	var path: String = GRAYBOX if user.has("--graybox") or user.has("--stairs") else LEVEL
 	var level: Node = (load(path) as PackedScene).instantiate()
 	root.add_child(level)
 	await physics_frame
@@ -58,6 +59,10 @@ func _run() -> void:
 
 	if OS.get_cmdline_user_args().has("--sweep"):
 		await _sweep()
+		quit()
+		return
+	if OS.get_cmdline_user_args().has("--stairs"):
+		await _stairs()
 		quit()
 		return
 	if OS.get_cmdline_user_args().has("--graybox"):
@@ -84,6 +89,42 @@ func _run() -> void:
 		for line: String in _failures:
 			print("FAIL  %s" % line)
 	quit(0 if _failures.is_empty() else 1)
+
+
+## Traces the body's height while it climbs the 0.25 m staircase, so a stair
+## that "feels wrong" can be read as numbers instead of guessed at.
+func _stairs() -> void:
+	await _place(Vector3(-31.0, 0.5, -5.0))
+	Input.action_press("move_up")
+
+	var visual: Node3D = _player.get_node("Visual") as Node3D
+	var last_body: float = _player.global_position.y
+	var last_seen: float = visual.global_position.y
+	var body_pop: float = 0.0
+	var seen_pop: float = 0.0
+	var airborne: int = 0
+	var falling: int = 0
+
+	for i: int in range(260):
+		await physics_frame
+		var body: float = _player.global_position.y
+		# The mesh's own height: the collider's, plus however far the step
+		# smoothing is currently holding it back. Asking for global_position
+		# does not reflect the offset while physics interpolation is on.
+		var seen: float = body + visual.position.y
+		body_pop = maxf(body_pop, absf(body - last_body))
+		seen_pop = maxf(seen_pop, absf(seen - last_seen))
+		last_body = body
+		last_seen = seen
+		if not _player.is_on_floor():
+			airborne += 1
+		if _animator.get_state() == &"fall":
+			falling += 1
+
+	print("climbed to y %.2f" % _player.global_position.y)
+	print("largest one-tick move:  collider %.3f m   rendered %.3f m" % [body_pop, seen_pop])
+	print("ticks not on floor: %d/260    ticks in the fall animation: %d" % [airborne, falling])
+	_release()
 
 
 ## Re-checks the graybox fixtures that the new, slower movement speeds affect:

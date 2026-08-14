@@ -16,10 +16,15 @@ extends CharacterBody3D
 ## level tells it which way "up the screen" is via [method set_view_yaw].
 ## Tuning values and the reasoning behind them are in docs/DECISIONS.md.
 
+## Slack added on top of a measured step so the capsule rides over the lip
+## rather than arriving exactly flush with it and catching.
+const STEP_CLEARANCE: float = 0.02
+
 @export_group("Movement")
-## Default pace, metres per second. Matched to the walk animation's own stride
-## so the feet don't skate — see PlayerAnimator.WALK_SPEED.
-@export_range(0.5, 12.0, 0.1) var walk_speed: float = 1.4
+## Default pace, metres per second. The walk animation's own stride is 1.4 m/s;
+## above that the blend leans slightly toward the run, which stays stride-matched
+## because the blend anchors sit at each clip's measured speed.
+@export_range(0.5, 12.0, 0.1) var walk_speed: float = 1.8
 ## Pace while the sprint key (shift) is held. Matched to the run animation.
 @export_range(1.0, 16.0, 0.1) var run_speed: float = 4.9
 ## How hard the player is pushed toward the target speed (m/s²).
@@ -63,9 +68,20 @@ extends CharacterBody3D
 ## Tallest ledge the player can walk up without jumping. Kept below
 ## floor_snap_length at runtime — the snap is what puts the body back down.
 @export_range(0.0, 1.0, 0.05) var max_step_height: float = 0.35
-## How far ahead to look for a ledge. Needs to exceed the capsule radius,
-## otherwise the body is already stopped short of the obstacle when we look.
-@export_range(0.1, 2.0, 0.05) var step_probe_distance: float = 0.5
+## Skin added to one tick of travel when looking ahead for a step. The probe is
+## deliberately short: looking half a metre ahead used to lift the body while it
+## was still well clear of the step, which reads as floating up to the stairs.
+@export_range(0.01, 0.3, 0.01) var step_probe_margin: float = 0.06
+## How quickly the mesh catches up after the collider steps up (higher =
+## snappier). The collider has to move in one tick or the physics is wrong, but
+## the character we actually see slides that height off over a moment instead.
+@export_range(1.0, 60.0, 1.0) var step_smoothing: float = 16.0
+## Smallest one-tick height change treated as a step rather than as ground
+## following. A 30° ramp at walking pace moves the body about 1 cm a tick.
+@export_range(0.01, 0.3, 0.01) var step_pop_threshold: float = 0.05
+## How long after a step the character still counts as on its feet, covering
+## the moment it is at tread height but has not yet walked onto the tread.
+@export_range(0.0, 0.5, 0.01) var step_grace_time: float = 0.2
 ## Multiplier on project gravity. > 1 keeps the fall from feeling floaty.
 @export_range(0.0, 5.0, 0.1) var gravity_scale: float = 1.4
 
@@ -81,6 +97,7 @@ var view_yaw: float = 0.0
 @onready var _collision: CollisionShape3D = $Collision
 @onready var _capsule: CapsuleShape3D = _collision.shape
 @onready var _animator: PlayerAnimator = $AnimationTree
+@onready var _visual: Node3D = $Visual
 
 ## Full standing capsule height, taken from the scene at load.
 var _stand_height: float = 1.75
@@ -95,6 +112,11 @@ var _jump_buffer_left: float = 0.0
 ## animation blends off the speed the body actually reached, not off the input.
 var _planar_speed: float = 0.0
 var _was_on_floor: bool = true
+## How far the mesh is currently held below the collider while it catches up
+## after a step, in metres.
+var _step_offset: float = 0.0
+## Counts down after a step; the character still counts as footed while positive.
+var _step_grace_left: float = 0.0
 ## velocity.y captured before move_and_slide, so a landing can report the speed
 ## it arrived at rather than the zero it has afterwards.
 var _fall_speed: float = 0.0
@@ -141,19 +163,37 @@ func _physics_process(delta: float) -> void:
 	velocity.z = planar.z
 	_planar_speed = planar.length()
 
-	if is_on_floor():
-		_try_step_up(planar)
+	var was_grounded: bool = is_on_floor()
+	var height_before: float = global_position.y
+	if was_grounded:
+		_try_step_up(planar, delta)
 	_fall_speed = maxf(-velocity.y, 0.0)
 	move_and_slide()
 
 	# is_on_floor() only means anything after move_and_slide, so the touchdown
 	# test has to come after it.
 	var grounded: bool = is_on_floor()
-	if grounded and not _was_on_floor:
+
+	# Measure the step from what the body actually did, not from what the probe
+	# asked for: a step is often attempted a tick or two before it takes, and
+	# the floor snap quietly puts the body back until it does.
+	var climbed: float = global_position.y - height_before
+	if was_grounded and absf(climbed) >= step_pop_threshold:
+		_absorb_step(climbed)
+		# Stepping up leaves the body briefly unsupported — at tread height but
+		# not yet over the tread. Without this grace it reads as falling on
+		# every stair.
+		_step_grace_left = step_grace_time
+	_step_grace_left = maxf(_step_grace_left - delta, 0.0)
+	_settle_step(delta)
+
+	# A step is not a fall and its arrival is not a landing.
+	var footed: bool = grounded or _step_grace_left > 0.0
+	if footed and not _was_on_floor:
 		_animator.play_land(_fall_speed)
 		landed.emit(_fall_speed)
-	_was_on_floor = grounded
-	_animator.set_locomotion(_planar_speed, grounded, _crouched)
+	_was_on_floor = footed
+	_animator.set_locomotion(_planar_speed, footed, _crouched)
 
 
 ## The pace being asked for: crouching beats sprinting, sprinting beats walking.
@@ -173,6 +213,26 @@ func is_crouching() -> bool:
 ## Horizontal speed reached on the last tick, m/s.
 func get_planar_speed() -> float:
 	return _planar_speed
+
+
+## Takes a sudden change in the collider's height out of the mesh, so a step
+## the physics has to take in one tick is not one the eye has to.
+##
+## Only sudden changes qualify: walking a ramp moves the body a fraction of a
+## centimetre a tick, which should follow the ground exactly.
+func _absorb_step(rise: float) -> void:
+	if absf(rise) < step_pop_threshold:
+		return
+	_step_offset = clampf(_step_offset - rise, -max_step_height, max_step_height)
+
+
+func _settle_step(delta: float) -> void:
+	if is_zero_approx(_step_offset) and is_zero_approx(_visual.position.y):
+		return
+	_step_offset = lerpf(_step_offset, 0.0, 1.0 - exp(-step_smoothing * delta))
+	if absf(_step_offset) < 0.001:
+		_step_offset = 0.0
+	_visual.position.y = _step_offset
 
 
 ## Follows the crouch key, except that you cannot stand up under something.
@@ -255,26 +315,56 @@ func _face_direction(direction: Vector3, delta: float) -> void:
 ## Lets the capsule walk up small ledges — stair treads, doorway thresholds —
 ## that [method move_and_slide] would otherwise stop dead against.
 ##
-## Rather than teleporting the body onto the ledge (which pops it forward), we
-## lift it by [member max_step_height] just before moving. The floor snap
-## inside [method move_and_slide] then puts it down again in the same tick:
-## onto the ledge once the body has cleared its face, or straight back where it
-## was until then. Nothing visible happens until the step is actually taken.
-func _try_step_up(planar_velocity: Vector3) -> void:
+## The body is raised by exactly the height of the step in front of it, found by
+## lifting a test transform, reaching over the obstacle and dropping back down
+## onto whatever is there. Lifting by the full [member max_step_height] instead
+## (as this used to) launches the character off every tread: it ends the tick
+## above the step with nothing underneath, so it counts as airborne, falls for a
+## tenth of a second, and plays the fall animation on each stair.
+## Returns how far the body was raised, or 0.0 if it did not step.
+func _try_step_up(planar_velocity: Vector3, delta: float) -> void:
 	if max_step_height <= 0.0 or planar_velocity.length_squared() < 0.01:
 		return
 
-	# Only bother when something wall-like is close ahead. Walkable slopes are
-	# left to move_and_slide so climbing them keeps its natural along-the-slope
-	# speed instead of being lifted straight up.
+	# Trigger only when this tick's travel is actually blocked. Looking further
+	# ahead lifts the body while it is still short of the step, which reads as
+	# floating up to the stairs.
+	var direction: Vector3 = planar_velocity.normalized()
+	var motion: Vector3 = direction * (planar_velocity.length() * delta + step_probe_margin)
+
+	# Walkable slopes are left to move_and_slide, so climbing them keeps its
+	# natural along-the-slope speed instead of being lifted straight up.
 	var ahead: KinematicCollision3D = KinematicCollision3D.new()
-	var probe: Vector3 = planar_velocity.normalized() * step_probe_distance
-	if not test_move(global_transform, probe, ahead):
+	if not test_move(global_transform, motion, ahead):
 		return
 	if ahead.get_normal().angle_to(Vector3.UP) <= floor_max_angle:
 		return
 
-	var lift: Vector3 = Vector3.UP * max_step_height
-	if test_move(global_transform, lift):
+	var headroom: Vector3 = Vector3.UP * max_step_height
+	if test_move(global_transform, headroom):
 		return
-	global_position += lift
+
+	# Measuring the tread needs a longer reach than moving does: the capsule
+	# only sits over the step once its centre has cleared its own radius past
+	# the face, and probing any shorter measures the face instead of the tread.
+	var over: Vector3 = direction * (_capsule.radius + step_probe_margin)
+	var raised: Transform3D = global_transform
+	raised.origin += headroom
+	if test_move(raised, over):
+		# Still blocked from up there, so it is a wall rather than a step.
+		return
+
+	raised.origin += over
+	var tread: KinematicCollision3D = KinematicCollision3D.new()
+	if not test_move(raised, -headroom, tread):
+		# Nothing to stand on over there — a gap, not a step.
+		return
+
+	var rise: float = max_step_height - tread.get_travel().length()
+	if rise <= 0.001:
+		return
+	# Raising by the step's own height would leave the capsule exactly flush with
+	# the lip, where it catches; STEP_CLEARANCE is the hair that clears it.
+	global_position.y += rise + STEP_CLEARANCE
+	# Don't let leftover downward velocity pull us straight back off the tread.
+	velocity.y = maxf(velocity.y, 0.0)
