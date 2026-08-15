@@ -17,7 +17,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 4 | Terrain & chunk streaming | `feature/phase-4-terrain` | ✅ Done (2026-08-13) |
 | 5 | Sand footprint physics | `feature/phase-5-footprints` | ✅ Done (2026-08-14) |
 | 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🟡 In progress — Part 1 + door/interaction system done (awaiting look review), Part 2 needs Meshy assets |
-| 6.5 | Game clock, day-night cycle & lighting (side-track) | `feature/daynight-lighting` | 🟡 In progress — clock ✅; cycle built & verified 2026-08-15, awaiting night-darkness pick; lighting next |
+| 6.5 | Game clock, day-night cycle & lighting (side-track) | `feature/daynight-lighting` | 🟡 In progress — clock ✅; cycle ✅ (night locked properly-dark 2026-08-15); piece 3 lighting + carried light next |
 | 7 | Integration & polish → v0.1 | `feature/phase-7-polish` | 🔲 Not started |
 
 Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `development` · ✅ Done (merged, gate passed)
@@ -267,7 +267,7 @@ Blocked on Joshua generating in Meshy: a rigged **camel** (`idle` + `walk`) and 
 
 1. **Game clock** — the timekeeping backbone: time-of-day state, tunable day length, signals for anything that reacts to time. No visuals of its own; everything later (sun, sky, lamps, future survival mechanics) reads from this one source.
 2. **Day-night cycle** — the sun actually travels: sun angle/color/energy, sky gradient, ambient and haze all keyed to the clock, so dawn, noon, dusk and night each read correctly in the palette.
-3. **Lighting enhancements** — the polish layer the cycle exposes: interior light (the oil lamp finally earns its `OmniLight3D`), shadow tuning, night visibility, whatever laddering the cycle reveals. This subsumes part of Phase 7's "full lighting pass" — record what's covered so Phase 7 reconciles rather than redoes.
+3. **Lighting enhancements** — the polish layer the cycle exposes: interior light (the oil lamp finally earns its `OmniLight3D`), shadow tuning, night visibility, whatever laddering the cycle reveals. This subsumes part of Phase 7's "full lighting pass" — record what's covered so Phase 7 reconciles rather than redoes. *(Scope grew with the night pick, 2026-08-15: night is **properly dark by design**, so piece 3 must deliver a **carried light source** (torch/lamp in hand) as the way to move through it — Joshua wants torches to be useful and night to carry a little horror.)*
 
 Deliverables and a quality gate are filled in **per piece at its planning session** (this keeps the phase honest — no gate written before the design conversation that defines it).
 
@@ -298,7 +298,7 @@ Deliverables and a quality gate are filled in **per piece at its planning sessio
 - The "warm late-afternoon" identity in ART_DIRECTION is the game's signature look; the cycle should treat it as the golden hour the day passes *through*, not discard it.
 - Visual tuning (sky colors, sun angles, night darkness) goes through same-vantage screenshot ladders for Joshua's picks, per the established pattern.
 
-**Planning status:** clock ✅ built & verified · cycle 🟡 built & verified, awaiting Joshua's night-darkness pick · lighting 🔲
+**Planning status:** clock ✅ built & verified · cycle ✅ built, verified & picked (properly dark) · lighting 🔲 next — must include a carried light
 
 ### Piece 2 — Day-night cycle (planned 2026-08-14 with Joshua)
 
@@ -316,10 +316,10 @@ Deliverables and a quality gate are filled in **per piece at its planning sessio
 
 **Quality gate**
 - [x] `verify_cycle` passes (16:00 reproduction, continuity, fog contract, sun/moon discipline, darkness monotonicity). *(Full-day sweep at 0.005 h steps: worst sun step 0.111°, color step 0.0036, energy step 0.007 — all far under the pop thresholds; the standalone scene reproduces the committed golden-hour values exactly, which is also the no-Game fallback test.)*
-- [ ] Joshua picks night darkness (and any dusk adjustments) from the ladder; picked values committed and re-verified. **← the open item.** Ladder artifact delivered 2026-08-15 (day sweep + 4 darkness rungs at two vantages, `tools/shoot_daynight.gd` reshoots it).
+- [x] Joshua picks night darkness (and any dusk adjustments) from the ladder; picked values committed and re-verified. *(Picked 2026-08-15: **properly dark, `night_darkness = 1.0`** — night should make carried torches useful and add a little horror aspect. No day-sweep adjustments requested. Committed as the export default and re-verified.)*
 - [x] Performance unchanged with the cycle running. *(`verify_cycle --perf`, windowed, sky re-rendering a full day every 24 s: 120 fps average, worst frame 10.85 ms over 600 frames — at the Phase 6 baseline of 119 fps / 8.55 ms. An earlier 1010 ms outlier reproduced as the documented macOS focus-call stall, not the cycle.)*
 - [x] Zero warnings; graybox, world and desert_environment run standalone; `verify_player`/`verify_terrain`/`verify_clock` all re-run green after the change.
-- [ ] ART_DIRECTION lighting palette + DECISIONS updated with the final colors (after the pick locks them).
+- [x] ART_DIRECTION lighting palette + DECISIONS updated with the final colors. *(The lighting palette section now documents the whole day as keyframes, with night's darkness as intent, not accident.)*
 
 **Handoff note (2026-08-15):** one trap found and recorded — the `Game` autoload DOES run under `--script` (older comments in `shoot_desert_look.gd` say otherwise); a tool that injects a node named "Game" gets silently auto-renamed while the environment keeps listening to the real autoload. Both new tools fetch `/root/Game` first and only inject as a fallback. The first ladder shoot produced 17 identical golden-hour frames because of exactly this.
 

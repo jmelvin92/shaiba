@@ -24,7 +24,8 @@ const DAY_SWEEP: Dictionary = {
 }
 const NIGHT_HOUR: float = 23.0
 const DARKNESS_RUNGS: Array[float] = [0.0, 0.35, 0.65, 1.0]
-const DEFAULT_DARKNESS: float = 0.35
+## The committed pick (Joshua, 2026-08-15): properly dark.
+const DEFAULT_DARKNESS: float = 1.0
 
 const LOAD_RADIUS: int = 5
 const SEARCH_EXTENT: float = 400.0

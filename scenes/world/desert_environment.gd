@@ -67,8 +67,10 @@ const MOON_FADE_HOURS: float = 1.0
 ## refresh every ~0.12 real seconds — far below a visible color step.
 const APPLY_EPSILON: float = 0.002
 
-## 0 = bright moonlit night, 1 = properly dark. Joshua picks from the ladder.
-@export_range(0.0, 1.0, 0.01) var night_darkness: float = 0.35:
+## 0 = bright moonlit night, 1 = properly dark. Joshua picked 1.0 from the
+## ladder (2026-08-15): night should make carried light matter, with a touch
+## of dread — see DECISIONS.
+@export_range(0.0, 1.0, 0.01) var night_darkness: float = 1.0:
 	set(value):
 		night_darkness = clampf(value, 0.0, 1.0)
 		_rebuild_keys()

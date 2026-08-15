@@ -21,10 +21,13 @@ These are the **only** colors in the game. Each has a matching flat-shaded `Stan
 | `night_blue` | `#34455E` | Deep shadow accents, night sky later, UI text |
 | `accent_gold` | `#E2A93B` | Highlights: lanterns, trims, interactables |
 
-**Lighting palette** (WorldEnvironment / DirectionalLight3D):
-- Sun color `#FFE9C4`, energy tuned for soft warm shadows, pitched like ~4pm sun.
-- Sky: gradient from `#FFEFD6` at the horizon to `#8FB8C9` overhead.
-- Ambient light tinted faintly warm; shadows soft-edged, never pure black (lift toward `night_blue`).
+**Lighting palette** (WorldEnvironment / DirectionalLight3D — since Phase 6.5 these are the day-night cycle's keyframes in `desert_environment.gd`, not static values):
+- **Golden hour (16:00), the signature look:** sun `#FFE9C4` at energy 1.2, pitched like ~4pm; sky `#FFEFD6` horizon → `#8FB8C9` overhead. The cycle reproduces this *exactly* — it is the anchor the whole day is calibrated around.
+- **Noon:** sun whitens toward `#FFF3DC` at energy 1.3; same sky.
+- **Dawn (05:00–06:30) / dusk (17:30–19:30):** sun warms through `#FFDCA8`/`#FFCE96` to the horizon glows `#FFB36B` (dawn) and `#FF9E63` (dusk); horizon sky passes through `#E8A06A` / `#F0975C`.
+- **Night (properly dark — Joshua's ladder pick, 2026-08-15):** sky `#101828` overhead, `#1F2B44` at the horizon (both are `night_blue` territory); a faint cool moon light `#BFD2E8` at energy 0.06. Night is *meant* to be dark: carried light (torches, the oil lamp) is useful, and a touch of dread is intended. `night_darkness` on `DesertEnvironment` blends back toward a bright-moonlit look if this ever needs revisiting.
+- Ambient always follows the sky (the Environment's ambient source), and fog color always equals the sky horizon color — at every hour, so the far dunes melt into haze by night exactly as by day.
+- Shadows soft-edged, never pure black (lift toward `night_blue`).
 
 Rule of thumb for cohesion: **large areas = sand tones; buildings = plaster/clay/wood; green and teal are scarce and precious; gold marks things you can interact with.**
 
