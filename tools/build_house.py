@@ -48,6 +48,7 @@ from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import adobe  # noqa: E402
 from lowpoly import PALETTE, Part, all_materials, clear_scene, export_glb  # noqa: E402
 
 PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -162,29 +163,14 @@ def wall_with_openings(
     height: tuple[float, float],
     openings: list[tuple[float, float, float, float]],
 ) -> None:
-    """Fill `span` x `height` with wall, skipping each opening.
+    """This building's walls, in this building's wall tone.
 
-    `axis` is the wall's normal ("x" or "y"); `outer`/`inner` are its two face
-    positions along that axis. Each opening is (span_lo, span_hi, z_lo, z_hi).
+    The implementation moved to tools/adobe.py when the second house wanted it.
+    The adapter stays because WALL is rebound at runtime by the `--wall` ladder,
+    so the tone has to be read per call rather than bound once.
     """
-    lo_a, hi_a = min(outer, inner), max(outer, inner)
-
-    def block(s0: float, s1: float, z0: float, z1: float) -> None:
-        if s1 - s0 < 1e-6 or z1 - z0 < 1e-6:
-            return
-        if axis == "x":
-            part.box((lo_a, s0, z0), (hi_a, s1, z1), WALL)
-        else:
-            part.box((s0, lo_a, z0), (s1, hi_a, z1), WALL)
-
-    ordered = sorted(openings)
-    cursor = span[0]
-    for s0, s1, z0, z1 in ordered:
-        block(cursor, s0, height[0], height[1])   # full-height pier before it
-        block(s0, s1, height[0], z0)              # under the opening
-        block(s0, s1, z1, height[1])              # lintel over the opening
-        cursor = s1
-    block(cursor, span[1], height[0], height[1])
+    adobe.wall_with_openings(part, axis, outer, inner, span, height,
+                             openings, WALL)
 
 
 def window_furniture(
@@ -259,30 +245,8 @@ def door_furniture(
 def vigas(part: Part, axis: str, face: float, span: tuple[float, float],
           z_centre: float, count: int, outward: float,
           skip: tuple[float, float] | None = None) -> None:
-    """The row of protruding roof-beam ends. Each is yawed a degree or two:
-    hand-hewn timber never lines up, and the jitter is what keeps the row from
-    reading as a machined comb.
-
-    `skip` leaves a gap in the rhythm — used over the entrance, where beams
-    would otherwise run straight through the awning hung beneath them.
-    """
-    half = 0.085
-    s0, s1 = span
-    step = (s1 - s0) / (count + 1)
-    for i in range(1, count + 1):
-        centre = s0 + step * i
-        if skip is not None and skip[0] <= centre <= skip[1]:
-            continue
-        yaw = (-1.6, 2.1, -0.9, 1.3, -2.2, 0.8)[i % 6]
-        length = 0.50 + (0.03 if i % 2 else -0.02)
-        if axis == "x":
-            near, far = sorted((face, face + outward * length))
-            part.box((near, centre - half, z_centre - half),
-                     (far, centre + half, z_centre + half), TRIM, yaw)
-        else:
-            near, far = sorted((face, face + outward * length))
-            part.box((centre - half, near, z_centre - half),
-                     (centre + half, far, z_centre + half), TRIM, yaw)
+    """This building's roof-beam ends, in its trim tone. See tools/adobe.py."""
+    adobe.vigas(part, axis, face, span, z_centre, count, outward, TRIM, skip)
 
 
 # --- the building ------------------------------------------------------------
