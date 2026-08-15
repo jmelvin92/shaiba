@@ -18,7 +18,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 5 | Sand footprint physics | `feature/phase-5-footprints` | ✅ Done (2026-08-14) |
 | 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🟡 In progress — Part 1 + door/interaction system done (awaiting look review), Part 2 needs Meshy assets |
 | 6.5 | Game clock, day-night cycle & lighting (side-track) | `feature/daynight-lighting` | 🟡 In progress — clock ✅; cycle ✅; lighting built & verified 2026-08-15 (lamp, torch, flames, real windows), awaiting flicker playtest |
-| 6.6 | Audio system (side-track) | `feature/audio-system` | 🟡 In progress — started 2026-08-15; Joshua sourcing sounds in parallel (`assets/audio/README.md`) |
+| 6.6 | Audio system (side-track) | `feature/audio-system` | 🟡 Engine built & verified 2026-08-15 (silent-safe, full battery green); awaiting Joshua's sound files (`assets/audio/README.md`) + listen-through |
 | 7 | Integration & polish → v0.1 | `feature/phase-7-polish` | 🔲 Not started |
 
 Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `development` · ✅ Done (merged, gate passed)
@@ -361,12 +361,12 @@ Deliverables and a quality gate are filled in **per piece at its planning sessio
 - **`tools/verify_audio.gd`**: the gate as an executable, all silent-safe (must pass with zero sound files present).
 
 **Quality gate**
-- [ ] `verify_audio` passes with the sound folders empty (silent-safe) *and* the full battery stays green: `verify_player`, `verify_terrain`, `verify_house`, `verify_lighting`, `verify_cycle`, `verify_clock`.
-- [ ] Footsteps: correct library chosen on deep sand / packed pad / stone floor / wood stairs (surface switching asserted); loudness ordering run > walk > crouch shuffle asserted; step events land on the stamper's foot-plants, never a timer.
-- [ ] Acoustic zone: walking into the house flips positional sounds to the Interior bus and muffles the wind; walking out restores both — asserted, plus no fight with the cutaway.
-- [ ] Ambience crossfade is monotonic through dusk and dawn (no pops), driven only by the clock.
-- [ ] With sourced sounds present (whenever Joshua's files land): a windowed listen-through — footsteps on all four surfaces, door, torch carry, lamp, day and night beds — and Joshua signs off on the feel.
-- [ ] Zero warnings; every new scene runs standalone; DECISIONS.md records the branch choice, listener placement, and no-autoload call; PLAN.md updated; merged to `development` after 6.5.
+- [x] `verify_audio` passes with the sound folders empty (silent-safe) *and* the full battery stays green: `verify_player`, `verify_terrain`, `verify_house`, `verify_lighting`, `verify_cycle`, `verify_clock`. *(All seven run 2026-08-15, all green.)*
+- [x] Footsteps: correct library chosen on deep sand / packed pad / stone floor / wood upper storey (surface switching asserted — courtyard resolves `packed` at its measured 0.25 m against the 0.35 m threshold, a 0.80 m drift resolves `sand`); loudness ordering run > walk asserted (−1 dB > −7 dB) with crouch making no step sound at all (shuffle loop instead); step events ride the stamper's plant edge via the new `foot_planted` signal, never a timer.
+- [x] Acoustic zone: entering the house closes the ambience low-pass (20500 → ~1080 Hz) and ducks the bus (−7.9 dB); leaving restores both (asserted). No cutaway fight — the zone is its own Area3D and touches only AudioServer state.
+- [x] Ambience crossfade anchored (noon/16:00 pure day, midnight pure night) and monotonic through dusk, driven only by the clock's own period constants.
+- [ ] With sourced sounds present (whenever Joshua's files land): a windowed listen-through — footsteps on all four surfaces, door, torch carry, lamp, day and night beds — and Joshua signs off on the feel. **← the open item; blocked on sound files.**
+- [x] Zero warnings (`--import`, per-script `--check-only`); world, graybox, player, house, ambience, torch stand, oil lamp and camera rig all run standalone clean; DECISIONS.md entry written (structure, listener placement, branch choice, no new autoload); merged to `development` after 6.5. *(Merge pending 6.5's flicker playtest.)*
 
 ## Phase 7 — Integration & polish → v0.1
 

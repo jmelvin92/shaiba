@@ -46,8 +46,10 @@ signal noise_made(world_position: Vector3, loudness: float)
 
 @export_group("Surface")
 ## Sand shallower than this sounds like packed earth rather than soft drift,
-## metres. The homestead courtyard sits well under it; dune bodies well over.
-@export_range(0.02, 1.0, 0.01) var packed_sand_depth: float = 0.2
+## metres. The homestead courtyard measures ~0.25 m after its POI thinning and
+## dune bodies 0.6+, so 0.35 splits them with margin — and desert thin-skins
+## under it sounding firm is the two-layer sand model working as intended.
+@export_range(0.02, 1.0, 0.01) var packed_sand_depth: float = 0.35
 
 ## Terrain query source, handed down by the Player (which got it from the
 ## level). Null on levels without terrain, where every ray answer comes from
