@@ -37,6 +37,13 @@ static func stream(sub_path: String, looped: bool = false) -> AudioStream:
 		var wav: AudioStreamWAV = found as AudioStreamWAV
 		if wav != null:
 			wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+			# loop_end defaults to frame 0, and LOOP_FORWARD with a
+			# zero-length loop region plays pure silence — it must be pushed
+			# to the last frame by hand. Frames come from the duration, not
+			# the byte count: the importer may store compressed data (QOA),
+			# where bytes no longer map 1:1 to frames.
+			wav.loop_begin = 0
+			wav.loop_end = int(wav.get_length() * float(wav.mix_rate))
 	_streams[sub_path] = found
 	return found
 
