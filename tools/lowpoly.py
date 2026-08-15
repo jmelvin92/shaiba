@@ -262,6 +262,93 @@ class Part:
         return obj
 
 
+def arched_frond(
+    part: Part,
+    origin: Vector,
+    yaw: float,
+    pitch_deg: float,
+    droop_deg: float,
+    length: float,
+    half_width: float,
+    segments: int,
+    material: str,
+    pinch: float = 0.86,
+    fold_base: float = 0.045,
+) -> None:
+    """One arching frond: a V-section prism swept along a drooping centreline.
+
+    Lives here because the palm's crown and the dry frond bush both want it —
+    the second real user, which is when CLAUDE.md says to extract.
+
+    The centreline is walked rather than solved — step forward, pitch down a
+    little, repeat — which gives a natural arc and lets `droop_deg` mean the
+    plain thing it sounds like (how much the frond falls away over its length).
+
+    The droop is *back-loaded* (the weights below grow along the frond) so the
+    frond leaves its base almost straight and only arches over near the tip.
+    Spreading it evenly bends the frond in the middle instead, which is what
+    makes a low-poly palm read as a yucca.
+
+    The section is a closed V — three faces per segment rather than the one a
+    flat card would need. A card has a single normal, so flat-shaded it reads as
+    a painted cutout and vanishes edge-on; the V catches the sun differently on
+    each face and gives the frond real volume.
+
+    `pinch` narrows alternate rings, which buys a feathery sawtooth silhouette
+    for no extra triangles. The default is the palm's gentle version; a dried
+    pinnate frond wants it much stronger.
+    """
+    pitch = math.radians(pitch_deg)
+    step = length / segments
+    weights = [((i + 0.5) / segments) ** 1.6 for i in range(segments)]
+    scale = math.radians(droop_deg) / sum(weights)
+    position = Vector(origin)
+    base_index = len(part.verts)
+
+    for i in range(segments + 1):
+        t = i / segments
+        # Width swells fast, holds most of it down the length, then runs out to
+        # a point in the last quarter — the leaflet mass of a real frond.
+        if t < 0.26:
+            width = half_width * (0.26 + 0.74 * (t / 0.26))
+        else:
+            width = half_width * (1.0 - ((t - 0.26) / 0.74) ** 2.2)
+        if i % 2 == 1:
+            width *= pinch
+        width = max(width, 0.02)
+
+        forward = Vector((
+            math.cos(yaw) * math.cos(pitch),
+            math.sin(yaw) * math.cos(pitch),
+            math.sin(pitch),
+        ))
+        side = Vector((-math.sin(yaw), math.cos(yaw), 0.0))
+        up = forward.cross(side)
+
+        fold_depth = fold_base + 0.22 * width
+        wing_rise = 0.20 * width
+        # Wound counter-clockwise seen from +forward: fold, right, left.
+        part.verts.append(position - up * fold_depth)
+        part.verts.append(position + side * width + up * wing_rise)
+        part.verts.append(position - side * width + up * wing_rise)
+
+        if i < segments:
+            position = position + forward * step
+            pitch -= weights[i] * scale
+
+    for i in range(segments):
+        near = base_index + i * 3
+        far = base_index + (i + 1) * 3
+        for k in range(3):
+            k2 = (k + 1) % 3
+            part.faces.append((near + k, near + k2, far + k2, far + k))
+            part.face_materials.append(material)
+
+    tip = base_index + segments * 3
+    part.faces.append((tip, tip + 1, tip + 2))
+    part.face_materials.append(material)
+
+
 def export_glb(objects: list, path: str) -> None:
     """Exports the given objects, following the ART_DIRECTION checklist."""
     for obj in bpy.data.objects:

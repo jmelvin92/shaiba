@@ -56,7 +56,9 @@ from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from lowpoly import Part, all_materials, clear_scene, export_glb  # noqa: E402
+from lowpoly import (  # noqa: E402
+    Part, all_materials, arched_frond, clear_scene, export_glb,
+)
 
 PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BLEND = os.path.join(PROJECT, "assets", "blender", "palm.blend")
@@ -153,78 +155,6 @@ def build_trunk(materials: dict) -> tuple[Part, Vector]:
 
 # --- crown -------------------------------------------------------------------
 
-def add_frond(
-    part: Part,
-    origin: Vector,
-    yaw: float,
-    pitch_deg: float,
-    droop_deg: float,
-    length: float,
-    half_width: float,
-    segments: int,
-) -> None:
-    """One arching frond: a V-section prism swept along a drooping centreline.
-
-    The centreline is walked rather than solved — step forward, pitch down a
-    little, repeat — which gives a natural arc and lets `droop_deg` mean the
-    plain thing it sounds like (how much the frond falls away over its length).
-
-    The droop is *back-loaded* (the weights below grow along the frond) so the
-    frond leaves the crown almost straight and only arches over near the tip.
-    Spreading it evenly bends the frond in the middle instead, which is what
-    makes a low-poly palm read as a yucca.
-    """
-    pitch = math.radians(pitch_deg)
-    step = length / segments
-    weights = [((i + 0.5) / segments) ** 1.6 for i in range(segments)]
-    scale = math.radians(droop_deg) / sum(weights)
-    position = Vector(origin)
-    base_index = len(part.verts)
-
-    for i in range(segments + 1):
-        t = i / segments
-        # Width swells fast, holds most of it down the length, then runs out to
-        # a point in the last quarter — the leaflet mass of a real frond.
-        if t < 0.26:
-            width = half_width * (0.26 + 0.74 * (t / 0.26))
-        else:
-            width = half_width * (1.0 - ((t - 0.26) / 0.74) ** 2.2)
-        if i % 2 == 1:
-            width *= 0.86   # the free feathery sawtooth
-        width = max(width, 0.02)
-
-        forward = Vector((
-            math.cos(yaw) * math.cos(pitch),
-            math.sin(yaw) * math.cos(pitch),
-            math.sin(pitch),
-        ))
-        side = Vector((-math.sin(yaw), math.cos(yaw), 0.0))
-        up = forward.cross(side)
-
-        fold_depth = 0.045 + 0.22 * width
-        wing_rise = 0.20 * width
-        # Wound counter-clockwise seen from +forward: fold, right, left.
-        part.verts.append(position - up * fold_depth)
-        part.verts.append(position + side * width + up * wing_rise)
-        part.verts.append(position - side * width + up * wing_rise)
-
-        if i < segments:
-            position = position + forward * step
-            pitch -= weights[i] * scale
-
-    for i in range(segments):
-        near = base_index + i * 3
-        far = base_index + (i + 1) * 3
-        for k in range(3):
-            k2 = (k + 1) % 3
-            part.faces.append((near + k, near + k2, far + k2, far + k))
-            part.face_materials.append(FROND)
-
-    tip = base_index + segments * 3
-    part.faces.append((tip, tip + 1, tip + 2))
-    part.face_materials.append(FROND)
-
-
 # count, pitch, droop, length, half-width, segments, mount height, yaw phase
 # Fronds are 0.8+ m across the leaflets on a real date palm; at 0.6 m the crown
 # read as a spray of blades rather than a mass of foliage.
@@ -248,7 +178,7 @@ def build_crown(materials: dict, rng: random.Random) -> Part:
             origin = Vector((0.0, 0.0, dz)) - Vector(
                 (math.cos(yaw), math.sin(yaw), 0.0)
             ) * 0.30
-            add_frond(
+            arched_frond(
                 part,
                 origin,
                 yaw,
@@ -257,6 +187,7 @@ def build_crown(materials: dict, rng: random.Random) -> Part:
                 length * rng.uniform(0.88, 1.08),
                 width,
                 segments,
+                FROND,
             )
 
     # Date clusters, hanging clear of the trunk under the frond bases. They must
