@@ -1,7 +1,8 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scenes/player/player.gd" id="1_player"]
 [ext_resource type="Script" path="res://scenes/player/footstep_stamper.gd" id="5_stamper"]
+[ext_resource type="Script" path="res://scenes/player/interactor.gd" id="6_interactor"]
 [ext_resource type="PackedScene" uid="uid://bjnccoqc0rir6" path="res://assets/models/player.glb" id="2_model"]
 [ext_resource type="AnimationNodeStateMachine" path="res://scenes/player/player_locomotion.tres" id="3_tree"]
 [ext_resource type="Script" path="res://scenes/player/player_animator.gd" id="4_animator"]
@@ -10,6 +11,9 @@
 resource_local_to_scene = true
 radius = 0.35
 height = 1.75
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_reach"]
+radius = 1.0
 
 [node name="Player" type="CharacterBody3D"]
 collision_layer = 2
@@ -26,6 +30,16 @@ shape = SubResource("CapsuleShape3D_body")
 
 [node name="FootstepStamper" type="Node" parent="."]
 script = ExtResource("5_stamper")
+
+[node name="Interactor" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+collision_layer = 0
+collision_mask = 8
+monitorable = false
+script = ExtResource("6_interactor")
+
+[node name="Reach" type="CollisionShape3D" parent="Interactor"]
+shape = SubResource("SphereShape3D_reach")
 
 [node name="AnimationTree" type="AnimationTree" parent="."]
 tree_root = ExtResource("3_tree")
