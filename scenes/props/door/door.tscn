@@ -32,7 +32,6 @@ collision_mask = 0
 monitoring = false
 script = ExtResource("3_interactable")
 prompt = "Open"
-prompt_anchor = Vector3(0.65, 2.55, 0)
 
 [node name="Reach" type="CollisionShape3D" parent="Interactable"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.64, 1.15, 0)

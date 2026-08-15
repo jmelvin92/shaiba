@@ -19,14 +19,12 @@ extends Area3D
 ## nothing here knows or cares what the prop does with it.
 signal interacted(actor: Node3D)
 
-## What the prompt offers, e.g. "Open". The prop may rewrite this as its state
-## changes; the Interactor re-reads it every tick.
+## What using this does right now, e.g. "Open". Nothing renders it (no
+## on-screen prompts — Joshua's call), but the prop keeps it true to its state:
+## the verify harness reads it, and a future accessibility toggle could.
 @export var prompt: String = "Use"
-## Where the prompt floats, in this node's local space — over the handle of a
-## door, above the lid of a chest.
-@export var prompt_anchor: Vector3 = Vector3(0.0, 1.5, 0.0)
-## Switched off, this volume neither prompts nor responds — for props that are
-## only sometimes usable (a locked door, a lamp with no oil).
+## Switched off, this volume neither responds nor is offered — for props that
+## are only sometimes usable (a locked door, a lamp with no oil).
 @export var enabled: bool = true
 
 ## Physics layer 4, as a mask bit.
@@ -43,8 +41,3 @@ func _ready() -> void:
 func interact(actor: Node3D) -> void:
 	if enabled:
 		interacted.emit(actor)
-
-
-## World-space point the prompt label hangs at.
-func get_prompt_position() -> Vector3:
-	return to_global(prompt_anchor)
