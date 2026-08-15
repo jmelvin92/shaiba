@@ -70,5 +70,7 @@ it, or ask Claude to relaunch the game.)
 ## Later (do NOT source yet — listed so the plan stays in one place)
 
 Camel (grunts, steps, chewing) · sand-slide on steep dunes · night creature ·
-music. This file is the ever-growing list: new features add their rows here
-before their sounds are sourced.
+music · **weather system sounds** (the current wind bed is a deliberately
+subtle stopgap; a future weather system brings sandstorm/gust-front/calm
+variants and takes over the ambience). This file is the ever-growing list:
+new features add their rows here before their sounds are sourced.

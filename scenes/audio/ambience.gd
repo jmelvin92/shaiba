@@ -16,10 +16,13 @@ extends Node3D
 const GameClock := preload("res://autoload/game.gd")
 
 @export_group("Beds")
-## Full-day loudness of the daytime wind bed.
-@export_range(-40.0, 6.0, 0.5) var day_volume_db: float = -8.0
+## Full-day loudness of the daytime wind bed. Deliberately subtle (Joshua,
+## 2026-08-15): the current bed is a stopgap until a real weather system
+## brings its own sounds, so it should sit under everything, never announce
+## itself.
+@export_range(-40.0, 6.0, 0.5) var day_volume_db: float = -16.0
 ## Full-night loudness of the night bed.
-@export_range(-40.0, 6.0, 0.5) var night_volume_db: float = -8.0
+@export_range(-40.0, 6.0, 0.5) var night_volume_db: float = -14.0
 
 @export_group("Gusts")
 ## Loudness of a gust one-shot at its source.
