@@ -16,7 +16,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 3 | Character model & animation | `feature/phase-3-character` | ✅ Done (2026-08-13) |
 | 4 | Terrain & chunk streaming | `feature/phase-4-terrain` | ✅ Done (2026-08-13) |
 | 5 | Sand footprint physics | `feature/phase-5-footprints` | ✅ Done (2026-08-14) |
-| 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🔲 Not started |
+| 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🟡 In progress — Part 1 (house) |
 | 7 | Integration & polish → v0.1 | `feature/phase-7-polish` | 🔲 Not started |
 
 Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `development` · ✅ Done (merged, gate passed)
@@ -184,16 +184,46 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 
 **Goal:** populate the desert with its first landmarks and life, all through the Phase 3 asset pipeline.
 
-**Deliverables**
-- **Desert house** in Blender: single-story mud-brick/adobe home with a wind-tower (barjeel), flat roof, arched doorway — palette plaster/clay colors, ≤ 4,000 tris. Placed as an enterable-later landmark (blocked door for now) with proper collision.
-- **Camel** in Blender: low-poly, ≤ 3,000 tris, `idle` + `walk` animations. Simple wander behavior (`camel.gd`): ambles within a home radius, avoids the house, registers as a sand stamper so it leaves tracks.
-- 2–3 small props from the same sessions' style: date palm, rocks, a well or cloth awning — enough to compose one scene.
-- A handcrafted "homestead" POI composed from these assets, spawned at a fixed seeded location near the player start; scattered rocks/palms hooked into chunk generation sparsely.
+**Restructured into two parts at Joshua's direction (2026-08-14):** the house and the building/interior *systems* come first and are hand-modelled in Blender; the camel becomes Part 2, waiting on a Meshy generation. Both parts share the branch `feature/phase-6-environment`; the quality gate closes and merges after Part 2.
 
-**Quality Gate**
+**Two design calls made at planning time, both Joshua's:**
+- **The interior is enterable now, with a roof-off cutaway** rather than a blocked door. The camera never moves to dodge geometry (fixed decision), so an indoor player is served by hiding everything above their story. Built as a reusable system, not a house feature — every future building gets it free.
+- **Every interior item is an independent, reusable asset** — its own `.blend`, `.glb` and scene folder. The house shell ships empty and *instances* furnishings. This is what lets a bed, rug or tapestry appear in any future building, become interactable on its own later, and be rearranged without re-exporting the house.
+
+**Reference-anchored:** Joshua supplied two screenshots (2026-08-14) that set the look — a two-story ochre adobe cube with protruding roof beams (vigas), an external stair and a cloth door awning; and a ground-floor **majlis** with low striped seating around a patterned rug, poufs, low table and hookah. They anchor proportion and silhouette; everything is rebuilt in our palette and flat-shaded low-poly rules, never copied.
+
+### Part 1 — House & building/interior systems
+
+**Deliverables**
+- **Homestead POI flattening** in `resources/terrain/terrain_settings.gd`: a deterministic site chosen near spawn, with the analytic field blended flat inside it and sand thinned to packed courtyard earth. Because mesh, collision, spawn seating, print-depth capping and the camera lift all sample the same functions, they inherit it for free — the "POI injection at generation time" hook ARCHITECTURE.md reserved.
+- **Desert house** via `tools/build_house.py` (committed headless Blender script, per the `build_player.py` pattern and the ART_DIRECTION export checklist): two-story adobe, gently irregular walls, flat roof + parapet, vigas, wood-framed windows, cloth awning over the door, external stair to the roof terrace. Palette materials only, ≤ 4,000 tris soft cap. Story slabs and roof are separately named objects so the cutaway can hide them.
+- **Reusable furnishing library** via `tools/build_furnishings.py`: `low_sofa`, `pouf`, `floor_cushion`, `low_table`, `rug`, `hookah`, `oil_lamp`, `curtain`, `bed`, `tapestry`, `pottery` — each ≤ 500 tris, each its own asset and scene folder.
+- **`scenes/props/house/`** — `house.tscn`/`house.gd` with hand-authored collision (walls `collision_layer = 5` fadeable; slabs and roof on layer 1 only, so the occluder fader never fights the cutaway for the same `transparency` property).
+- **`scenes/props/interior_cutaway.gd`** (`InteriorCutaway`) — story-aware: an `Area3D` per story, exported lists of the visuals above it, smooth fade out on entry and back on exit.
+- **`scenes/world/homestead.tscn`** — house plus furnishing instances, spawned by `LevelRoot` at the seeded homestead centre; player start moves to the courtyard.
+
+**Part 1 exit bar**
+- [ ] `tools/verify_house.gd` passes: doorway passable at walk and run, walls block, stair climbs, cutaway fires on entry and exit with roof transparency asserted.
+- [ ] `verify_terrain` (all modes) and `verify_player` still pass — flattening must not break determinism, seams or the slope audit.
+- [ ] Screenshots at the gameplay camera reviewed by Joshua (approach, doorway, interior with cutaway).
+- [ ] Zero errors/warnings: headless `--import`, per-script `--check-only`, standalone scene runs.
+
+### Part 2 — Camel & the missing player clips
+
+Blocked on Joshua generating in Meshy: a rigged **camel** (`idle` + `walk`) and the **player clips** Phase 3 left missing (forward crouch-walk, a real fall, a landing).
+
+**Deliverables**
+- **Camel** conditioned by `tools/build_camel.py` per the imported-asset audit (facing, emission/material fixes, texture downscale, `measure_gaits` stride numbers, root-motion check), ≤ 3,000 tris target.
+- `scenes/props/camel/camel.tscn` + `camel.gd`: ambles within a home radius, avoids the house, animates off planar speed (the Phase 3 pattern), never intersects house or player, `collision_layer = 5`.
+- **Camel tracks** via its own stamper child + one `connect` — exactly what the Phase 5 stamper interface was built for.
+- **Player clips folded in**: rebuild through `build_player.py`, wire into the AnimationTree, closing the known crouch foot-slide gap; re-measure gaits and retune `crouch_speed`.
+- Small props chosen as-we-go with Joshua (well, palms, rocks…); chunk-scattered vegetation keys off `get_sand_depth` when scatter props exist.
+
+**Quality Gate** (whole phase)
 - [ ] Screenshot of the homestead at gameplay angle looks cohesive — one style, one palette, cozy (side-by-side check against ART_DIRECTION.md).
 - [ ] Camel wanders, animates without sliding, leaves believable tracks, never intersects the house or player.
 - [ ] All assets: .blend + .glb committed, correct collision, no errors, stable 60 fps+ with everything on screen.
+- [ ] Interior reads clearly at the gameplay camera: walking in and out never leaves the player hidden or the roof stuck faded.
 - [ ] PLAN.md updated; merged to `development`.
 
 ## Phase 7 — Integration & polish → v0.1

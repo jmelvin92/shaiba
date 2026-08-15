@@ -28,6 +28,17 @@ These are the **only** colors in the game. Each has a matching flat-shaded `Stan
 
 Rule of thumb for cohesion: **large areas = sand tones; buildings = plaster/clay/wood; green and teal are scarce and precious; gold marks things you can interact with.**
 
+## Reference images
+
+`docs/references/` holds the visual references Joshua has supplied, committed so later sessions build against the same target rather than a remembered description. (`docs/` carries a `.gdignore` so Godot never imports them as game textures.)
+
+| File | What it anchors |
+|------|-----------------|
+| `house_exterior.png` | The desert house (Phase 6): two-story ochre adobe cube, flat roof + parapet, protruding roof-beam ends (vigas) in a row under the roofline, dark wood-framed windows, cloth awning on poles over the door, external stair up one side to the roof terrace. |
+| `house_interior_majlis.png` | The ground-floor **majlis** (Phase 6): low striped seating along two walls, patterned rug, poufs and floor cushions, low table with tray, hookah, curtained windows. |
+
+A reference anchors **proportion, silhouette and the set of features** — never materials. Everything is rebuilt flat-shaded in the palette above: the references' photo-textures, stucco noise and off-palette fabrics (the reds, greens and blues of the majlis) become palette colors, with fabric pattern carried by colored faces rather than texture.
+
 ## Modeling rules (low-poly, flat-shaded)
 
 - **Flat shading always**: shade-flat in Blender (or split normals); materials use roughness 1.0, metallic 0, no textures. Color comes from palette materials (or vertex colors sampled from the palette for terrain variation).
