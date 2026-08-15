@@ -1,7 +1,12 @@
 extends SceneTree
 ## Screenshots a prop .glb in the real desert, at the real gameplay camera.
 ##
-##   Godot --path . --script res://tools/shoot_prop.gd -- <outdir> <res://...glb> [name]
+##   Godot --path . --script res://tools/shoot_prop.gd -- \
+##       <outdir> <glb[,glb...]> [name] [count] [spread]
+##
+## Several comma-separated paths shoot as one mixed scatter, which is the only
+## honest way to judge a *set* — a rock reads differently beside its siblings
+## than it does alone.
 ##
 ## Blender's Workbench previews (the `--render` flag on the build scripts) are
 ## for proportion and silhouette against a grey card. They cannot answer the
@@ -18,8 +23,13 @@ extends SceneTree
 const SETTLE_FRAMES: int = 40
 
 var _outdir: String = ""
-var _prop: PackedScene = null
+var _props: Array[PackedScene] = []
 var _label: String = "prop"
+var _planted: int = 0
+## How many to scatter, and over what radius. Small scatter props need a field;
+## a landmark needs a handful.
+var _count: int = 4
+var _spread: float = 7.0
 
 
 func _init() -> void:
@@ -35,14 +45,20 @@ func _start() -> void:
 func _run() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 	if args.size() < 2:
-		push_error("usage: -- <outdir> <res://path.glb> [name]")
+		push_error("usage: -- <outdir> <res://path.glb[,...]> [name]")
 		return
 	_outdir = args[0]
-	_prop = load(args[1]) as PackedScene
-	if _prop == null:
-		push_error("could not load %s" % args[1])
-		return
+	for path: String in args[1].split(",", false):
+		var packed: PackedScene = load(path) as PackedScene
+		if packed == null:
+			push_error("could not load %s" % path)
+			return
+		_props.append(packed)
 	_label = args[2] if args.size() > 2 else args[1].get_file().get_basename()
+	if args.size() > 3:
+		_count = int(args[3])
+	if args.size() > 4:
+		_spread = float(args[4])
 	DirAccess.make_dir_recursive_absolute(_outdir)
 
 	var level: Node3D = (load("res://scenes/world/world.tscn") as PackedScene).instantiate() as Node3D
@@ -65,16 +81,19 @@ func _run() -> void:
 	# A grove out on open sand, well clear of the homestead pad, so the palm is
 	# judged against dunes rather than against the one flat spot in the world.
 	var grove_at: Vector2 = Vector2(home.x + 46.0, home.z - 30.0)
-	var grove: Array[Vector2] = [
-		grove_at,
-		grove_at + Vector2(5.4, 2.1),
-		grove_at + Vector2(-3.2, 5.6),
-		grove_at + Vector2(2.4, -6.0),
-	]
-	var yaws: Array[float] = [18.0, 140.0, 251.0, 76.0]
-	var scales: Array[float] = [1.0, 0.86, 1.09, 0.94]
-	for i: int in range(grove.size()):
-		_plant(level, terrain, grove[i], yaws[i], scales[i])
+	# Deterministic scatter: a handful of big props reads as a grove, and a
+	# field of small ones is the only way to judge scatter texture at all.
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = 20260814
+	for i: int in range(_count):
+		var angle: float = rng.randf() * TAU
+		var reach: float = _spread * sqrt(rng.randf())
+		_plant(
+			level, terrain,
+			grove_at + Vector2(cos(angle), sin(angle)) * reach,
+			rng.randf() * 360.0,
+			rng.randf_range(0.78, 1.25),
+		)
 
 	# And a pair by the house, which is the cohesion check: one style, one
 	# palette, the new asset next to the one we already approved.
@@ -110,7 +129,9 @@ func _run() -> void:
 func _plant(
 	level: Node3D, terrain: TerrainSettings, at: Vector2, yaw: float, scale: float
 ) -> void:
-	var node: Node3D = _prop.instantiate() as Node3D
+	# Cycle the set so a scatter mixes every variant rather than repeating one.
+	var node: Node3D = _props[_planted % _props.size()].instantiate() as Node3D
+	_planted += 1
 	level.add_child(node)
 	node.global_position = Vector3(at.x, terrain.get_surface_height(at), at.y)
 	node.rotation.y = deg_to_rad(yaw)
