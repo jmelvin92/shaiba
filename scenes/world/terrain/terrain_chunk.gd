@@ -48,9 +48,12 @@ static func build_data(settings: TerrainSettings, coord: Vector2i) -> BuildData:
 	var colors: PackedColorArray = []
 	colors.resize(n * n)
 
-	var shadow: Color = _palette_color("sand_shadow")
-	var mid: Color = _palette_color("sand_mid")
-	var light: Color = _palette_color("sand_light")
+	# Read off the settings resource, never load()ed here: build_data runs on
+	# worker threads, and a thread-side load() misses runtime palette changes
+	# (ChunkManager fills these from the palette .tres on the main thread).
+	var shadow: Color = settings.sand_shadow_color
+	var mid: Color = settings.sand_mid_color
+	var light: Color = settings.sand_light_color
 
 	for j: int in range(n):
 		# World coordinates derive from *global integer* grid indices, so the
@@ -141,10 +144,3 @@ func apply(data: BuildData) -> void:
 	_collision.position = data.collision_offset
 
 
-## The palette .tres files are the single source of truth for sand tones; the
-## builder reads them rather than repeating hex values.
-static func _palette_color(palette_name: String) -> Color:
-	var material: StandardMaterial3D = load(
-		"res://resources/palette/%s.tres" % palette_name
-	) as StandardMaterial3D
-	return material.albedo_color

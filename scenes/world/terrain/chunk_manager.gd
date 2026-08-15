@@ -18,6 +18,10 @@ extends Node3D
 ## whoever else needs it via [method get_terrain].
 
 const CHUNK_SCENE: PackedScene = preload("res://scenes/world/terrain/terrain_chunk.tscn")
+## The one material every chunk renders with. The manager owns pushing
+## terrain-derived uniforms into it (currently the wind direction the ripple
+## shading lies across); per-print uniforms stay SandDeformation's job.
+const TERRAIN_MATERIAL: ShaderMaterial = preload("res://resources/terrain/sand_terrain_material.tres")
 
 ## The desert's noise fields and tunables — normally resources/terrain/desert.tres.
 @export var settings: TerrainSettings
@@ -58,8 +62,13 @@ func _ready() -> void:
 	if game == null:
 		push_warning("ChunkManager: Game autoload missing; seeding terrain with 0.")
 		settings.setup(0)
-		return
-	settings.setup(game.world_seed)
+	else:
+		settings.setup(game.world_seed)
+	settings.load_palette()
+	var wind_yaw: float = deg_to_rad(settings.wind_yaw_degrees)
+	TERRAIN_MATERIAL.set_shader_parameter(
+		"ripple_wind_dir", Vector2(cos(wind_yaw), sin(wind_yaw))
+	)
 
 
 ## Called by the owning level. Synchronously builds the chunks around the

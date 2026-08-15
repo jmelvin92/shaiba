@@ -33,6 +33,9 @@ extends Resource
 ## Dune bodies. Sampled in wind-aligned, stretched coordinates so dunes
 ## elongate across the wind direction.
 @export var dune_noise: FastNoiseLite
+## Mega-dunes: the giant Shaybah-scale ridges the ordinary dune field rides on
+## top of. Same wind-aligned sampling as dune_noise, far lower frequency.
+@export var mega_noise: FastNoiseLite
 ## Medium-scale signed variation in sand thickness — patchiness that lets the
 ## hard ground show through where it goes negative.
 @export var drift_noise: FastNoiseLite
@@ -48,6 +51,12 @@ extends Resource
 ## Shaping exponent on the dune field. > 1 widens the flats between dunes and
 ## rounds the transition where a dune rises out of them.
 @export_range(1.0, 3.0, 0.05) var dune_sharpness: float = 1.35
+## Height of the mega-dune ridges, metres. 0 disables the field entirely —
+## the desert Phase 4 shipped is exactly mega_amplitude = 0.
+@export_range(0.0, 40.0, 0.5) var mega_amplitude: float = 0.0
+## Shaping exponent on the mega field — same role as dune_sharpness: widens
+## the low ground between ridges and sharpens their crests.
+@export_range(1.0, 3.0, 0.05) var mega_sharpness: float = 1.6
 ## Amplitude of the signed sand-thickness variation, metres.
 @export_range(0.0, 2.0, 0.05) var drift_amplitude: float = 0.5
 ## Height of the small ripples, metres. Kept subtle: the camera is 23 m out.
@@ -91,6 +100,22 @@ extends Resource
 ## Amplitude of the seeded per-vertex tone jitter that keeps the depth
 ## gradient from reading as contour bands. Fraction of the 0–1 tone range.
 @export_range(0.0, 0.3, 0.01) var tone_dither: float = 0.08
+## How much of the mega-dune height counts toward the colour ramp. Mega-dunes
+## are tens of metres of sand, which would pin the whole ridge at the ramp's
+## sand_light end; discounting most of it keeps the ordinary dune-vs-flat
+## tonal read on the mega slopes, with just a gentle lightening toward the
+## great crests.
+@export_range(0.0, 1.0, 0.05) var mega_tone_weight: float = 0.15
+
+## The sand tones the chunk builder bakes into vertex colours. Filled from the
+## resources/palette/ .tres files by [method load_palette] on the main thread
+## before any builds start — a worker thread calling load() gets its own cache
+## view, so a builder-side load would silently miss any runtime palette change
+## (that exact failure is why these live here). Defaults mirror the committed
+## palette so a settings resource used without load_palette still renders sane.
+var sand_shadow_color: Color = Color("A85419")
+var sand_mid_color: Color = Color("D97E2E")
+var sand_light_color: Color = Color("EFA254")
 
 ## Wind rotation applied to dune sample coordinates, cached by [method setup].
 var _wind_cos: float = 1.0
@@ -119,10 +144,27 @@ func setup(world_seed: int) -> void:
 	dune_noise.seed = world_seed + 1
 	drift_noise.seed = world_seed + 2
 	ripple_noise.seed = world_seed + 3
+	if mega_noise != null:
+		mega_noise.seed = world_seed + 4
 	var wind_yaw: float = deg_to_rad(wind_yaw_degrees)
 	_wind_cos = cos(wind_yaw)
 	_wind_sin = sin(wind_yaw)
 	_choose_homestead(world_seed)
+
+
+## Reads the sand tones out of the palette .tres files (still the single
+## source of truth for the hex values). Main thread only, before builds start.
+func load_palette() -> void:
+	sand_shadow_color = _palette_color("sand_shadow")
+	sand_mid_color = _palette_color("sand_mid")
+	sand_light_color = _palette_color("sand_light")
+
+
+static func _palette_color(palette_name: String) -> Color:
+	var material: StandardMaterial3D = load(
+		"res://resources/palette/%s.tres" % palette_name
+	) as StandardMaterial3D
+	return material.albedo_color
 
 
 ## Centre of the homestead pad, world XZ. Deterministic from the world seed.
@@ -170,7 +212,17 @@ func _raw_sand_depth(world_xz: Vector2) -> float:
 	var dune_raw: float = maxf(dune_noise.get_noise_2d(along, across), 0.0)
 	var dunes: float = dune_amplitude * pow(dune_raw, dune_sharpness)
 	var drift: float = drift_amplitude * drift_noise.get_noise_2d(world_xz.x, world_xz.y)
-	return maxf(dunes + drift + depth_floor, 0.0)
+	return maxf(dunes + drift + depth_floor + _mega_height(along, across), 0.0)
+
+
+## The mega-dune ridge height at a point already rotated into the wind frame.
+## Mega-dunes are sand, so they live in the depth field: prints, deep-sand
+## movement and the colour ramp all see them without any new plumbing.
+func _mega_height(along: float, across: float) -> float:
+	if mega_amplitude <= 0.0 or mega_noise == null:
+		return 0.0
+	var raw: float = maxf(mega_noise.get_noise_2d(along, across), 0.0)
+	return mega_amplitude * pow(raw, mega_sharpness)
 
 
 ## How completely the homestead pad overrides the desert at a point: 1 on the
@@ -255,5 +307,15 @@ func get_surface_height(world_xz: Vector2) -> float:
 ## Sand depth normalised to the colour ramp, 0–1. Shared by the mesh builder
 ## (vertex COLOR.a, Phase 5's per-fragment print-depth cap) and anything that
 ## wants "how sandy is it here" without caring about metres.
+##
+## Most of the mega-dune height is discounted first (see mega_tone_weight);
+## the print-depth cap doesn't care — anywhere on a mega-dune is still far
+## deeper than a full print needs — and the tonal read is what's at stake.
 func get_normalized_depth(world_xz: Vector2) -> float:
-	return clampf(get_sand_depth(world_xz) / tone_full_depth, 0.0, 1.0)
+	var depth: float = get_sand_depth(world_xz)
+	if mega_amplitude > 0.0:
+		var along: float = (world_xz.x * _wind_cos + world_xz.y * _wind_sin) * wind_stretch
+		var across: float = -world_xz.x * _wind_sin + world_xz.y * _wind_cos
+		var discount: float = _mega_height(along, across) * (1.0 - mega_tone_weight)
+		depth = maxf(depth - discount * (1.0 - _homestead_weight(world_xz)), 0.0)
+	return clampf(depth / tone_full_depth, 0.0, 1.0)

@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="TerrainSettings" load_steps=6 format=3]
+[gd_resource type="Resource" script_class="TerrainSettings" load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://resources/terrain/terrain_settings.gd" id="1_settings"]
 
@@ -11,6 +11,12 @@ fractal_gain = 0.4
 [sub_resource type="FastNoiseLite" id="FastNoiseLite_dune"]
 noise_type = 1
 frequency = 0.013
+fractal_octaves = 2
+fractal_gain = 0.35
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_mega"]
+noise_type = 1
+frequency = 0.0015
 fractal_octaves = 2
 fractal_gain = 0.35
 
@@ -30,11 +36,14 @@ chunk_size = 64
 cell_size = 1.0
 base_noise = SubResource("FastNoiseLite_base")
 dune_noise = SubResource("FastNoiseLite_dune")
+mega_noise = SubResource("FastNoiseLite_mega")
 drift_noise = SubResource("FastNoiseLite_drift")
 ripple_noise = SubResource("FastNoiseLite_ripple")
 base_amplitude = 3.0
 dune_amplitude = 6.5
 dune_sharpness = 1.35
+mega_amplitude = 15.0
+mega_sharpness = 1.6
 drift_amplitude = 0.9
 ripple_amplitude = 0.09
 depth_floor = 0.15
@@ -43,3 +52,4 @@ wind_yaw_degrees = 30.0
 wind_stretch = 0.4
 tone_full_depth = 3.0
 tone_dither = 0.15
+mega_tone_weight = 0.15

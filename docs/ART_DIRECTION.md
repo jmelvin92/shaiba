@@ -10,9 +10,9 @@ These are the **only** colors in the game. Each has a matching flat-shaded `Stan
 
 | Name | Hex | Use |
 |------|-----|-----|
-| `sand_light` | `#EFD9A7` | Sunlit sand, dune tops |
-| `sand_mid` | `#DFB878` | Base sand, mid tones |
-| `sand_shadow` | `#C4914E` | Dune shadow sides, compacted sand in footprints |
+| `sand_light` | `#EFA254` | Sunlit sand, dune tops |
+| `sand_mid` | `#D97E2E` | Base sand, mid tones |
+| `sand_shadow` | `#A85419` | Dune shadow sides, compacted sand in footprints |
 | `clay` | `#B97350` | Terracotta, pottery, roof edges, bricks |
 | `plaster` | `#F2E7CF` | Whitewashed walls, cloth, camel-light accents |
 | `wood` | `#8A5A3B` | Doors, beams, well frame, palm trunks |
@@ -36,6 +36,7 @@ Rule of thumb for cohesion: **large areas = sand tones; buildings = plaster/clay
 |------|-----------------|
 | `house_exterior.png` | The desert house (Phase 6): two-story ochre adobe cube, flat roof + parapet, protruding roof-beam ends (vigas) in a row under the roofline, dark wood-framed windows, cloth awning on poles over the door, external stair up one side to the roof terrace. |
 | `house_interior_majlis.png` | The ground-floor **majlis** (Phase 6): low striped seating along two walls, patterned rug, poufs and floor cushions, low table with tray, hookah, curtained windows. |
+| `shaybah_dunes.jpg` | The desert itself (Phase 6 restyle): rich Shaybah orange sand — source of the 2026-08-14 sand trio — fine wind-combed ripples lying across the wind, and mega-dune ridges dwarfing the ordinary dune field. |
 
 A reference anchors **proportion, silhouette and the set of features** — never materials. Everything is rebuilt flat-shaded in the palette above: the references' photo-textures, stucco noise and off-palette fabrics (the reds, greens and blues of the majlis) become palette colors, with fabric pattern carried by colored faces rather than texture.
 

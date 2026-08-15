@@ -4,3 +4,6 @@
 
 [resource]
 shader = ExtResource("1_shader")
+shader_parameter/ripple_strength = 0.08
+shader_parameter/ripple_wavelength = 2.4
+shader_parameter/ripple_trough_tint = 0.12

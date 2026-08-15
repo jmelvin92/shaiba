@@ -2,6 +2,6 @@
 
 [resource]
 resource_name = "sand_light"
-albedo_color = Color(0.937255, 0.85098, 0.654902, 1)
+albedo_color = Color(0.937255, 0.635294, 0.329412, 1)
 roughness = 1.0
 metallic = 0.0
