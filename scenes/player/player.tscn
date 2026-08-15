@@ -1,6 +1,7 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scenes/player/player.gd" id="1_player"]
+[ext_resource type="Script" path="res://scenes/player/hand_socket.gd" id="7_socket"]
 [ext_resource type="Script" path="res://scenes/player/footstep_stamper.gd" id="5_stamper"]
 [ext_resource type="Script" path="res://scenes/player/interactor.gd" id="6_interactor"]
 [ext_resource type="PackedScene" uid="uid://bjnccoqc0rir6" path="res://assets/models/player.glb" id="2_model"]
@@ -27,6 +28,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.875, 0)
 shape = SubResource("CapsuleShape3D_body")
 
 [node name="Visual" parent="." instance=ExtResource("2_model")]
+
+[node name="HandSocket" type="Node3D" parent="."]
+script = ExtResource("7_socket")
 
 [node name="FootstepStamper" type="Node" parent="."]
 script = ExtResource("5_stamper")

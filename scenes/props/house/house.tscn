@@ -11,7 +11,7 @@
 [ext_resource type="PackedScene" uid="uid://6ll1x2cxet87" path="res://assets/models/floor_cushion.glb" id="8_cushion"]
 [ext_resource type="PackedScene" uid="uid://v4xp4n6ipnjb" path="res://assets/models/pottery.glb" id="9_pottery"]
 [ext_resource type="PackedScene" uid="uid://ckd152v1oi2vq" path="res://assets/models/hookah.glb" id="10_hookah"]
-[ext_resource type="PackedScene" uid="uid://hlrkgf321vfb" path="res://assets/models/oil_lamp.glb" id="11_lamp"]
+[ext_resource type="PackedScene" path="res://scenes/props/oil_lamp/oil_lamp.tscn" id="11_lamp"]
 [ext_resource type="PackedScene" uid="uid://d18u6421iseo0" path="res://assets/models/bed.glb" id="12_bed"]
 [ext_resource type="PackedScene" uid="uid://bx5mhhgnetfig" path="res://assets/models/tapestry.glb" id="13_tapestry"]
 

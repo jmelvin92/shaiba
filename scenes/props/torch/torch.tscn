@@ -1,0 +1,16 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scenes/props/torch/torch.gd" id="1_torch"]
+[ext_resource type="PackedScene" path="res://assets/models/torch.glb" id="2_model"]
+[ext_resource type="Script" path="res://scenes/props/flame_light.gd" id="3_flame"]
+
+[node name="Torch" type="Node3D"]
+script = ExtResource("1_torch")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+
+[node name="Flame" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+script = ExtResource("3_flame")
+light_range = 9.0
+base_energy = 1.9

@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/props/house/house.tscn" id="1_house"]
+[ext_resource type="PackedScene" path="res://scenes/props/torch/torch_stand.tscn" id="2_stand"]
 
 [node name="Homestead" type="Node3D"]
 
@@ -9,3 +10,6 @@ transform = Transform3D(0.965926, 0, 0.258819, 0, 1, 0, -0.258819, 0, 0.965926, 
 
 [node name="PlayerSpawn" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.6, 0, -6.4)
+
+[node name="TorchStand" parent="." instance=ExtResource("2_stand")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.55, 0, -3.85)

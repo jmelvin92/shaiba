@@ -79,7 +79,9 @@ const APPLY_EPSILON: float = 0.002
 @onready var _sun: DirectionalLight3D = $Sun
 @onready var _moon: DirectionalLight3D = $Moon
 @onready var _environment: Environment = ($WorldEnvironment as WorldEnvironment).environment
-@onready var _sky: ProceduralSkyMaterial = _environment.sky.sky_material as ProceduralSkyMaterial
+## The sky is shaders/desert_sky.gdshader since piece 3 (stars needed a
+## custom shader); it reproduces ProceduralSkyMaterial's gradient exactly.
+@onready var _sky: ShaderMaterial = _environment.sky.sky_material as ShaderMaterial
 
 ## The Game autoload, fetched the guarded way so the scene stays standalone-
 ## safe (F6, --script tools). Without it the cycle holds the 16:00 look.
@@ -117,12 +119,14 @@ func apply_time(hour: float) -> void:
 	_applied_hour = h
 	var key: LightKey = _blend_keys(h)
 
-	_sky.sky_top_color = key.top
-	_sky.sky_horizon_color = key.horizon
-	_sky.ground_horizon_color = key.horizon
+	_sky.set_shader_parameter(&"top_color", key.top)
+	_sky.set_shader_parameter(&"horizon_color", key.horizon)
+	_sky.set_shader_parameter(&"ground_horizon_color", key.horizon)
 	var ground_dim: float = clampf(
 		key.horizon.get_luminance() / DAY_HORIZON.get_luminance(), 0.05, 1.0)
-	_sky.ground_bottom_color = DAY_GROUND_BOTTOM * Color(ground_dim, ground_dim, ground_dim)
+	_sky.set_shader_parameter(
+		&"ground_bottom_color", DAY_GROUND_BOTTOM * Color(ground_dim, ground_dim, ground_dim))
+	_sky.set_shader_parameter(&"star_strength", _star_strength(h))
 	_environment.fog_light_color = key.horizon
 
 	var day_u: float = (h - _sunrise) / (_sunset - _sunrise)
@@ -137,6 +141,17 @@ func apply_time(hour: float) -> void:
 	_sun.visible = _sun.light_energy > 0.001
 
 	_apply_moon(h)
+
+
+## Stars share the moon's night window and fade at its edges, but over twice
+## the span, so they linger into late dusk and early dawn the way real ones do.
+func _star_strength(h: float) -> float:
+	var night_length: float = 24.0 - (_sunset - _sunrise)
+	var night_u: float = fposmod(h - _sunset, 24.0) / night_length
+	if night_u < 0.0 or night_u > 1.0:
+		return 0.0
+	return clampf(
+		minf(night_u, 1.0 - night_u) * night_length / (MOON_FADE_HOURS * 2.0), 0.0, 1.0)
 
 
 func _apply_moon(h: float) -> void:

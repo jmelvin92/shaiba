@@ -17,7 +17,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 4 | Terrain & chunk streaming | `feature/phase-4-terrain` | ✅ Done (2026-08-13) |
 | 5 | Sand footprint physics | `feature/phase-5-footprints` | ✅ Done (2026-08-14) |
 | 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🟡 In progress — Part 1 + door/interaction system done (awaiting look review), Part 2 needs Meshy assets |
-| 6.5 | Game clock, day-night cycle & lighting (side-track) | `feature/daynight-lighting` | 🟡 In progress — clock ✅; cycle ✅ (night locked properly-dark 2026-08-15); piece 3 lighting + carried light next |
+| 6.5 | Game clock, day-night cycle & lighting (side-track) | `feature/daynight-lighting` | 🟡 In progress — clock ✅; cycle ✅; lighting built & verified 2026-08-15 (lamp, torch, flames, real windows), awaiting flicker playtest |
 | 7 | Integration & polish → v0.1 | `feature/phase-7-polish` | 🔲 Not started |
 
 Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `development` · ✅ Done (merged, gate passed)
@@ -298,7 +298,26 @@ Deliverables and a quality gate are filled in **per piece at its planning sessio
 - The "warm late-afternoon" identity in ART_DIRECTION is the game's signature look; the cycle should treat it as the golden hour the day passes *through*, not discard it.
 - Visual tuning (sky colors, sun angles, night darkness) goes through same-vantage screenshot ladders for Joshua's picks, per the established pattern.
 
-**Planning status:** clock ✅ built & verified · cycle ✅ built, verified & picked (properly dark) · lighting 🔲 next — must include a carried light
+**Planning status:** clock ✅ built & verified · cycle ✅ built, verified & picked (properly dark) · lighting 🟡 built & verified, awaiting Joshua's flicker playtest
+
+### Piece 3 — Lighting enhancements (planned 2026-08-15 with Joshua)
+
+**Joshua's calls at planning:** flame flicker matters ("the flicker of a flame looking really good"); the house should **glow from inside through the windows** when the oil lamp is lit at night; the torch is **taken from a stand at the homestead** (E takes it, E returns it — being caught in the dark far from home is part of the game); the oil lamp is **lit by the player** (E, dark until someone lights it); the night sky gets **subtle stars**. He consistently picked the interactive option over the convenient one — light is something you do.
+
+**Deliverables**
+- **`FlameLight`** (`scenes/props/flame_light.gd`, reusable component): OmniLight3D + small flame visual, noise-driven flicker (energy + position dance, never a strobe), warm palette color, `lit` switch. One component serves lamp, torch, and any future campfire.
+- **Oil lamp becomes a real prop** — the first per-prop scene wrapper, exactly as the Part 1 handoff notes reserved: `scenes/props/oil_lamp/oil_lamp.tscn` + script wrapping the existing glb, with a FlameLight and an Interactable (Light/Snuff). Shadows on, so the lit lamp spills real light through the door and window openings — the glow-from-outside moment.
+- **Torch + stand** via `tools/build_torch.py` (≤ 500 tris each): a wall-mounted or free-standing torch stand by the house door holding a torch; E takes the torch into the player's hand (bone attachment), E at the stand returns it. The stand uses the standard Interactable; the player script stays untouched.
+- **Stars**: the sky becomes a small custom sky shader reproducing today's four-color gradient exactly, plus a sparse procedural starfield faded in by the cycle after dusk and out at dawn (`star_strength` driven like every other keyframed value). *(Built and verified — but measured invisible in normal play: the fixed 19°/35° camera tops out 1.5° above horizontal, where the horizon is always fog-melted terrain by design. The starfield stays in the shader, free and correct, for any future view that tilts up. See DECISIONS.)*
+- **`tools/verify_lighting.gd`**: lamp lights and snuffs via real interaction; torch is taken and returned and its light truly travels with the player; flicker stays inside bounds (no strobe, no dead flame while lit); stars are zero by day and present at night; the 16:00 golden-hour reproduction still holds after the sky-shader swap.
+- Night screenshots at the gameplay camera: lamp-lit house from outside, torch-lit walk in the dark.
+
+**Quality gate**
+- [x] `verify_lighting` passes; `verify_cycle` (incl. 16:00 reproduction + fog contract) still passes after the sky swap; `verify_clock`, `verify_player`, `verify_terrain`, `verify_house` all still green. *(Full battery re-run 2026-08-15, all green. verify_lighting drives real E-key interaction: lamp lights/snuffs with prompt tracking, torch take/carry/return with the light truly travelling, flicker bounded and alive, stars zero by day / full at deep night.)*
+- [x] The glow-from-outside screenshot reads: lit windows and doorway visible from the courtyard at night, dark when the lamp is snuffed. *(The majlis window burns warm through the real opening — Joshua's mid-build call made windows actual holes; the recess panels are gone from `build_house.py` and `verify_house` still passes on the rebuilt model.)*
+- [ ] Flame flicker approved by Joshua in the running game (feel, not measurable). **← the open item: playtest.**
+- [x] Performance: no measurable regression with lamp + torch lit and shadows on. *(120 fps average, worst frame 10.78 ms measured with both shadowed flames burning at night — at the baseline.)*
+- [x] Zero warnings; standalone scene runs clean; docs updated (ART_DIRECTION gains the flame/emissive rule + real-openings rule, DECISIONS the choices and the two traps).
 
 ### Piece 2 — Day-night cycle (planned 2026-08-14 with Joshua)
 

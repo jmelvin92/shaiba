@@ -29,6 +29,8 @@ These are the **only** colors in the game. Each has a matching flat-shaded `Stan
 - Ambient always follows the sky (the Environment's ambient source), and fog color always equals the sky horizon color — at every hour, so the far dunes melt into haze by night exactly as by day.
 - **The haze is distance-only** (Joshua's ladder pick, 2026-08-15): depth fog, crystal clear to 100 m, full melt by 330 m — inside the ~350 m streaming edge. The playable frame carries no fog wash at all; the haze exists solely to dissolve the horizon. `verify_cycle` asserts the shape.
 - Shadows soft-edged, never pure black (lift toward `night_blue`).
+- **Flames are the one emissive thing in the game** (piece 3, 2026-08-15): `FlameLight`'s flame color is `#FFC873` (between `accent_gold` and the dusk sun tones), used for the tiny flame mesh (emissive) and its flickering OmniLight3D. Nothing else may emit — a light source visibly glowing is the point; glowing props that aren't fire are not.
+- **Window openings are real holes** (Joshua's call, 2026-08-15 — supersedes the shadowed-recess panel in the original house): interior lamplight must spill through them at night. Model windows as openings, never as dark panels.
 
 Rule of thumb for cohesion: **large areas = sand tones; buildings = plaster/clay/wood; green and teal are scarce and precious; gold marks things you can interact with.**
 

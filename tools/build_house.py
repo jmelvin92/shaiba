@@ -63,7 +63,8 @@ DEFAULT_WALL = "clay"
 WALL = "clay"          # adobe mass: walls, parapet, stair (--wall <palette name>)
 TRIM = "wood"          # vigas, window frames, sills, door jambs
 DECK = "sand_shadow"   # the roof terrace, which really is dust over the slab
-GLASS = "night_blue"   # window recesses, read as shadow rather than glazing
+# (Window recesses used to carry a night_blue "shadow" panel; the openings are
+# real holes since 2026-08-15 so interior lamplight can pass — see DECISIONS.)
 CLOTH = "plaster"      # the awning
 
 # --- dimensions, metres ------------------------------------------------------
@@ -198,8 +199,9 @@ def window_furniture(
         else:
             part.box((a0, lo_c, b0), (a1, hi_c, b1), material)
 
-    # The recess: a dark panel set back in the reveal, reading as shadow.
-    place(s0, s1, z0, z1, recess, recess - facing * 0.06, GLASS)
+    # No panel fills the opening: windows are real holes, so lamplight from
+    # inside spills out at night (Joshua's call, 2026-08-15 — supersedes the
+    # original shadowed-recess panel).
     # Frame: four bars around the opening edge.
     place(s0, s0 + 0.09, z0, z1, frame_out, frame_in, TRIM)
     place(s1 - 0.09, s1, z0, z1, frame_out, frame_in, TRIM)

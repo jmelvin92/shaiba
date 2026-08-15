@@ -1,15 +1,18 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scenes/world/desert_environment.gd" id="1_denv"]
+[ext_resource type="Shader" path="res://shaders/desert_sky.gdshader" id="2_skyshader"]
 
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
-sky_top_color = Color(0.560784, 0.721569, 0.788235, 1)
-sky_horizon_color = Color(1, 0.937255, 0.839216, 1)
-ground_bottom_color = Color(0.768627, 0.568627, 0.305882, 1)
-ground_horizon_color = Color(1, 0.937255, 0.839216, 1)
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
+shader = ExtResource("2_skyshader")
+shader_parameter/top_color = Color(0.560784, 0.721569, 0.788235, 1)
+shader_parameter/horizon_color = Color(1, 0.937255, 0.839216, 1)
+shader_parameter/ground_bottom_color = Color(0.768627, 0.568627, 0.305882, 1)
+shader_parameter/ground_horizon_color = Color(1, 0.937255, 0.839216, 1)
+shader_parameter/star_strength = 0.0
 
 [sub_resource type="Sky" id="Sky_sky"]
-sky_material = SubResource("ProceduralSkyMaterial_sky")
+sky_material = SubResource("ShaderMaterial_sky")
 
 [sub_resource type="Environment" id="Environment_env"]
 background_mode = 2
