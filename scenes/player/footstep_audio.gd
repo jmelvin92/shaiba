@@ -114,6 +114,11 @@ func on_foot_planted(world_xz: Vector2) -> void:
 	var takes: AudioStreamRandomizer = SoundBank.take_set(
 		"footsteps/%s_%s" % [_surface, "run" if running else "walk"]
 	)
+	if takes == null and running:
+		# No dedicated run set for this surface: reuse its walk takes at run
+		# loudness (Joshua's call, 2026-08-15). A sourced *_run set anywhere
+		# in assets/audio automatically takes precedence over this fallback.
+		takes = SoundBank.take_set("footsteps/%s_walk" % _surface)
 	var at: Vector3 = Vector3(world_xz.x, global_position.y, world_xz.y)
 	_play(_step_player, takes, last_step_volume_db, at)
 	noise_made.emit(at, 1.0 if running else 0.5)

@@ -20,6 +20,10 @@ it, or ask Claude to relaunch the game.)
 
 ## footsteps/ — sets of 4–6 takes each
 
+Run sets (`*_run`) are **optional**: a surface without one automatically
+reuses its walk takes at run loudness. Sourcing a real run set for a surface
+overrides the fallback the moment its files land.
+
 | Files | What it should sound like |
 |---|---|
 | `sand_walk_01..04+.wav` | Soft, deep dry sand underfoot — muffled crunch |
