@@ -472,10 +472,18 @@ def build_stair(materials: dict) -> bpy.types.Object:
     # Outer parapet: one solid with a cleanly sloped top following the flight,
     # levelling off along the landing — the diagonal wedge that reads as "stair"
     # from across the courtyard, long before the treads themselves resolve.
+    #
+    # The slope needs its knee at the stair head. Drawn as one straight line to
+    # the far end of the landing (as it first was), the top sags below the
+    # treads' rise and is only ~0.15 m above them near the head — which the
+    # player's step-up rightly reads as a step, so drifting against the rail
+    # walked you over it and off the outside of the flight. A rail only guards
+    # what stays more than max_step_height above the walking surface beside it.
     rail = 0.85
     profile = [
         (STAIR_Y0, -FOUNDATION),
         (STAIR_Y0, STAIR_RISE + rail),
+        (landing_hi, UPPER_BASE + rail),
         (landing_lo - 0.28, UPPER_BASE + rail),
         (landing_lo - 0.28, -FOUNDATION),
     ]
