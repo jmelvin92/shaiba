@@ -151,11 +151,19 @@ var _was_on_floor: bool = true
 ## How far the mesh is currently held below the collider while it catches up
 ## after a step, in metres.
 var _step_offset: float = 0.0
+## World-space horizontal displacement still to be worked out of the mesh after
+## a low-momentum step advanced the body onto a tread (see _try_step_up).
+var _step_shift: Vector3 = Vector3.ZERO
 ## Counts down after a step; the character still counts as footed while positive.
 var _step_grace_left: float = 0.0
 ## velocity.y captured before move_and_slide, so a landing can report the speed
 ## it arrived at rather than the zero it has afterwards.
 var _fall_speed: float = 0.0
+## Every steep face the failed step probes ran into this tick — what the
+## face-normal fallback in [method _try_step_up] measures against. More than
+## one matters: wedged into a corner, the sweep meets the unclimbable flanking
+## wall *and* the climbable riser, and only the riser can get you out.
+var _probe_faces: Array[Vector3] = []
 ## Sand depth under the player this tick, metres. 0 whenever there is no
 ## terrain, which is what keeps every sand effect inert on the graybox.
 var _sand_depth: float = 0.0
@@ -222,7 +230,7 @@ func _physics_process(delta: float) -> void:
 	var was_grounded: bool = is_on_floor()
 	var height_before: float = global_position.y
 	if was_grounded:
-		_try_step_up(planar, delta)
+		_try_step_up(planar, direction, delta)
 	_fall_speed = maxf(-velocity.y, 0.0)
 	move_and_slide()
 
@@ -297,9 +305,13 @@ func _absorb_step(rise: float) -> void:
 ## zero while the sand sink eases toward the local depth, and the mesh shows
 ## the sum of both.
 func _settle_step(delta: float) -> void:
-	_step_offset = lerpf(_step_offset, 0.0, 1.0 - exp(-step_smoothing * delta))
+	var weight: float = 1.0 - exp(-step_smoothing * delta)
+	_step_offset = lerpf(_step_offset, 0.0, weight)
 	if absf(_step_offset) < 0.001:
 		_step_offset = 0.0
+	_step_shift = _step_shift.lerp(Vector3.ZERO, weight)
+	if _step_shift.length_squared() < 0.000001:
+		_step_shift = Vector3.ZERO
 
 	# Feet only settle while they are on the ground; a jump lifts them out.
 	var sink_target: float = 0.0
@@ -309,7 +321,12 @@ func _settle_step(delta: float) -> void:
 	if _sink_offset < 0.001 and sink_target == 0.0:
 		_sink_offset = 0.0
 
-	_visual.position.y = _step_offset - _sink_offset
+	# The shift is banked in world space; the visual hangs under a body that
+	# turns, so it is converted to local axes fresh each tick.
+	var local_shift: Vector3 = global_basis.inverse() * _step_shift
+	_visual.position = Vector3(
+		local_shift.x, _step_offset - _sink_offset, local_shift.z
+	)
 
 
 ## Follows the crouch key, except that you cannot stand up under something.
@@ -400,15 +417,29 @@ func _face_direction(direction: Vector3, delta: float) -> void:
 ## (as this used to) launches the character off every tread: it ends the tick
 ## above the step with nothing underneath, so it counts as airborne, falls for a
 ## tenth of a second, and plays the fall animation on each stair.
-## Returns how far the body was raised, or 0.0 if it did not step.
-func _try_step_up(planar_velocity: Vector3, delta: float) -> void:
+##
+## The step is looked for in up to three directions, because one is not enough
+## (measured; see DECISIONS on the stair-foot jam). What the player is
+## *pressing* comes first — velocity is useless the moment sliding has turned
+## it parallel to a riser, which is exactly how drifting into a flight used to
+## deflect you off it instead of climbing. Velocity is the fallback when there
+## is no input worth reading. And when both of those are blocked by a steep
+## face, the step is measured square against that face itself: a diagonal
+## approach sweeps a longer path over the tread and clips the next riser or a
+## flanking wall, so measuring along the approach reads a climbable flight as a
+## wall — perpendicular to the face is the one direction the measurement is
+## honest in. Face-normal climbing only happens when the input genuinely
+## pushes into the face, so brushing past a curb never hoists you onto it.
+func _try_step_up(planar_velocity: Vector3, wish_direction: Vector3, delta: float) -> void:
 	if max_step_height <= 0.0 or planar_velocity.length_squared() < 0.01:
 		return
 
-	# Trigger only when this tick's travel is actually blocked. Looking further
-	# ahead lifts the body while it is still short of the step, which reads as
-	# floating up to the stairs.
-	var direction: Vector3 = planar_velocity.normalized()
+	var candidates: Array[Vector3] = []
+	if wish_direction.length_squared() > 0.5:
+		candidates.append(wish_direction.normalized())
+	var travel: Vector3 = planar_velocity.normalized()
+	if candidates.is_empty() or travel.dot(candidates[0]) < 0.999:
+		candidates.append(travel)
 
 	# The probe runs against a slightly slimmer body than we collide with.
 	#
@@ -424,20 +455,58 @@ func _try_step_up(planar_velocity: Vector3, delta: float) -> void:
 	# The probe's reach is widened by the same amount, so it still meets a real
 	# obstacle at exactly the distance it used to.
 	var full_radius: float = _capsule.radius
-	var motion: Vector3 = direction * (
+	var reach: float = (
 		planar_velocity.length() * delta + step_probe_margin + step_probe_slim
 	)
 	_capsule.radius = maxf(full_radius - step_probe_slim, 0.05)
-	var rise: float = _measure_step(direction, motion, full_radius)
-	_capsule.radius = full_radius
 
+	var rise: float = -1.0
+	var stepped: Vector3 = Vector3.ZERO
+	_probe_faces.clear()
+	for direction: Vector3 in candidates:
+		rise = _measure_step(direction, direction * reach, full_radius)
+		if rise > 0.001:
+			stepped = direction
+			break
+	if rise <= 0.001:
+		# The approaches read a wall, but they did meet steep faces. Measure
+		# square against each face the input is actually pushing into — in a
+		# corner that skips the flanking wall and finds the riser beside it.
+		for normal: Vector3 in _probe_faces.duplicate():
+			var face: Vector3 = -normal
+			face.y = 0.0
+			if face.length_squared() <= 0.01:
+				continue
+			face = face.normalized()
+			if wish_direction.dot(face) <= 0.4:
+				continue
+			rise = _measure_step(face, face * reach, full_radius)
+			if rise > 0.001:
+				stepped = face
+				break
+	_capsule.radius = full_radius
 	if rise <= 0.001:
 		return
+
 	# Raising by the step's own height would leave the capsule exactly flush with
 	# the lip, where it catches; STEP_CLEARANCE is the hair that clears it.
 	global_position.y += rise + STEP_CLEARANCE
 	# Don't let leftover downward velocity pull us straight back off the tread.
 	velocity.y = maxf(velocity.y, 0.0)
+
+	# With walking momentum, the raise is all the help that is needed — the next
+	# few centimetres of ordinary movement put the body onto the tread. Pressed
+	# into a corner there is no momentum: the raise leaves the capsule perched
+	# on the tread's lip over its old footing, it slides straight back off, and
+	# the cycle repeats forever a few times a second (measured — this was the
+	# stair-foot jam). So at low speed the body is also advanced to the spot the
+	# measurement just proved out: the drop that found the tread was taken one
+	# reach past the face, with the path onto it swept clear. The visual absorbs
+	# the shift the same way it absorbs the vertical pop.
+	if _planar_speed < 1.0:
+		var advance: Vector3 = stepped * (full_radius + step_probe_margin)
+		global_position += advance
+		_step_shift -= advance
 
 
 ## How far the body must rise to stand on what is blocking it, or -1 if there
@@ -449,10 +518,14 @@ func _measure_step(direction: Vector3, motion: Vector3, full_radius: float) -> f
 	# Walkable slopes are left to move_and_slide, so climbing them keeps its
 	# natural along-the-slope speed instead of being lifted straight up.
 	var ahead: KinematicCollision3D = KinematicCollision3D.new()
-	if not test_move(global_transform, motion, ahead):
+	if not test_move(global_transform, motion, ahead, 0.001, false, 4):
 		return -1.0
 	if ahead.get_normal().angle_to(Vector3.UP) <= floor_max_angle:
 		return -1.0
+	for i: int in range(ahead.get_collision_count()):
+		var normal: Vector3 = ahead.get_normal(i)
+		if normal.angle_to(Vector3.UP) > floor_max_angle:
+			_probe_faces.append(normal)
 
 	var headroom: Vector3 = Vector3.UP * max_step_height
 	if test_move(global_transform, headroom):
