@@ -68,10 +68,12 @@ func _run() -> void:
 
 	await _spawn_check()
 	_floor_clears_the_sand()
+	await _front_door_is_a_mechanic()
 	await _doorway_passable("walk", false, WALK_TICKS)
 	await _doorway_passable("run", true, RUN_TICKS)
 	await _walls_block()
 	await _stair_climbs()
+	await _upper_door_enters()
 	await _lanes_are_wide_enough()
 	await _cutaway_closes()
 	await _layers_are_sane()
@@ -121,12 +123,148 @@ func _floor_clears_the_sand() -> void:
 		)
 
 
+## The front door as the player meets it: closed it is a wall, E swings it
+## open, E closes it again, and the prompt over it says which of those the
+## key currently does. Exercises the whole interaction chain — Interactor
+## overlap, prompt, Interactable signal, Door swing, moving collision — the
+## way a hand on the keyboard would.
+func _front_door_is_a_mechanic() -> void:
+	var door: Door = _house.get_node(^"FrontDoor") as Door
+	var interactor: Interactor = _player.get_node(^"Interactor") as Interactor
+	var forward: Vector3 = -_house.global_transform.basis.z
+	var side: Vector3 = _house.global_transform.basis.x
+	var at_door: Vector3 = _house.global_position + forward * 4.3 - side * 1.10
+	var at_door_xz: Vector2 = Vector2(at_door.x, at_door.z)
+
+	if door.is_open():
+		_fail("front door: starts open; a house should start shut")
+
+	# Closed = wall. Walk straight at it and stay outside.
+	_aim(at_door, at_door - forward * 10.0)
+	await _stand_at(at_door_xz)
+	await _hold("move_up", WALK_TICKS, false)
+	print("front door closed: inside=%s" % _cutaway.is_open())
+	if _cutaway.is_open():
+		_fail("front door: the player walked through it while it was closed")
+
+	# In reach, the interactor must be offering exactly this door, as "Open".
+	await _stand_at(at_door_xz)
+	var target: Interactable = interactor.get_target()
+	if target == null or not door.is_ancestor_of(target):
+		_fail("front door: no interact prompt offered within reach of it")
+	elif target.prompt != "Open":
+		_fail("front door: closed but the prompt says %s" % target.prompt)
+
+	# E opens it, away from the player, and the doorway becomes real.
+	await _press_interact()
+	if not door.is_open():
+		_fail("front door: pressing E outside did not open it")
+	await _swing_settle()
+	# Step just across the threshold — far enough to be inside, near enough
+	# that the door is still within the interactor's reach for the next press.
+	await _hold("move_up", 90, false)
+	print("front door opened: inside=%s" % _cutaway.is_open())
+	if not _cutaway.is_open():
+		_fail("front door: opened, but the player still could not walk in")
+
+	# E from inside closes it — and the closed leaf holds the player in.
+	var closed_prompt: String = ""
+	if interactor.get_target() != null:
+		closed_prompt = interactor.get_target().prompt
+	await _press_interact()
+	if door.is_open():
+		_fail("front door: pressing E inside did not close it")
+	if closed_prompt != "Close":
+		_fail("front door: open but the prompt said '%s'" % closed_prompt)
+	await _swing_settle()
+	await _hold("move_down", WALK_TICKS, false)
+	print("front door reclosed: inside=%s" % _cutaway.is_open())
+	if not _cutaway.is_open():
+		_fail("front door: closed behind the player but did not hold them in")
+
+	# And E again lets them back out.
+	await _press_interact()
+	await _swing_settle()
+	await _hold("move_down", WALK_TICKS, false)
+	if _cutaway.is_open():
+		_fail("front door: reopened, but the player could not walk back out")
+	print("front door: open/close cycle complete (left open)")
+
+
+## The upper door: reachable from the stair head, opens on E, and actually
+## admits the player to the upper storey. This entry was never gate-tested
+## before doors existed — the stair check only measured height climbed.
+func _upper_door_enters() -> void:
+	var door: Door = _house.get_node(^"UpperDoor") as Door
+	var forward: Vector3 = -_house.global_transform.basis.z
+	var side: Vector3 = _house.global_transform.basis.x
+	var up_floor: float = _house.to_global(Vector3(0.0, 3.05, 0.0)).y
+	# On the landing at the stair head, aimed diagonally at the doorway.
+	var start: Vector3 = _house.global_position + side * 4.5 - forward * 2.6
+	var goal: Vector3 = _house.global_position + side * 3.2 - forward * 0.8
+
+	if door.is_open():
+		_fail("upper door: starts open")
+	_aim(start, goal)
+	_player.global_position = Vector3(start.x, up_floor + 0.1, start.z)
+	_player.velocity = Vector3.ZERO
+	_player.reset_physics_interpolation()
+	_rig.snap_to_target()
+	for _i: int in range(40):
+		await physics_frame
+
+	await _press_interact()
+	if not door.is_open():
+		_fail("upper door: pressing E on the landing did not open it")
+	await _swing_settle()
+	await _hold("move_up", 240, false)
+
+	var local: Vector3 = _house.to_local(_player.global_position)
+	print("upper door: entered to local=(%.2f, %.2f, %.2f), cutaway open=%s"
+		% [local.x, local.y, local.z, _cutaway.is_open()])
+	if local.y < 2.9 or absf(local.x) > 3.5 or absf(local.z) > 3.0:
+		_fail("upper door: opened but the player could not walk into the upper room")
+	elif not _cutaway.is_open():
+		_fail("upper door: player is in the upper room but the cutaway stayed shut")
+
+	# Walk back out the way a hand on WASD would: line up with the doorway
+	# first, then straight out through it onto the stair head. One rigid
+	# diagonal bearing would press the capsule into the jamb corner and hang —
+	# steering around a corner is play, not a defect.
+	var line_up: Vector3 = _house.global_position + side * 2.8 - forward * 0.95
+	var out_through: Vector3 = _house.global_position + side * 5.2 - forward * 0.95
+	_aim(_player.global_position, line_up)
+	await _hold("move_up", 130, false)
+	_aim(_player.global_position, out_through)
+	await _hold("move_up", 200, false)
+	if _cutaway.is_open():
+		_fail("upper door: the player could not walk back out to the stair")
+	door.set_open(false, true)
+
+
+## One press of the interact key, plus the frames for it to land and settle.
+func _press_interact() -> void:
+	Input.action_press("interact")
+	await physics_frame
+	await physics_frame
+	Input.action_release("interact")
+	for _i: int in range(8):
+		await physics_frame
+
+
+## Waits out a door swing (0.45 s at 60 Hz, plus slack).
+func _swing_settle() -> void:
+	for _i: int in range(40):
+		await physics_frame
+
+
 ## Walks in through the front door and out again, at one gait.
 ##
 ## Passability is the whole point: a doorway that models fine can still be
 ## unwalkable if a jamb, a lintel or a threshold eats the clearance, and none
 ## of that shows in a screenshot of the outside.
 func _doorway_passable(gait: String, running: bool, ticks: int) -> void:
+	(_house.get_node(^"FrontDoor") as Door).set_open(true, true)
 	var door_axis: Vector3 = -_house.global_transform.basis.z
 	var side: Vector3 = _house.global_transform.basis.x
 	var outside: Vector3 = _house.global_position + door_axis * 9.0 - side * 1.2
@@ -255,6 +393,7 @@ func _sweep_lanes(
 ## The building must close up again once the player leaves — and while they are
 ## inside, the roof must actually be gone rather than merely intended to be.
 func _cutaway_closes() -> void:
+	(_house.get_node(^"FrontDoor") as Door).set_open(true, true)
 	var door_axis: Vector3 = -_house.global_transform.basis.z
 	var side: Vector3 = _house.global_transform.basis.x
 	var outside: Vector3 = _house.global_position + door_axis * 9.0 - side * 1.2
@@ -307,7 +446,25 @@ func _layers_are_sane() -> void:
 			if not cutaway_owned and not fadeable \
 					and not House.FLOOR_PARTS.has(part.name):
 				wrong.append("%s can neither fade nor be cut away" % part.name)
-	print("collision layers: %d parts checked, %d wrong"
+	# Doors follow the wall they are mounted in: the front door must be on the
+	# fader's layer like the ground walls, the upper door off it like the upper
+	# walls (its leaf is cutaway-managed instead). Their Interactables must sit
+	# alone on the interaction layer, where nothing physical can see them.
+	for check: Array in [[^"FrontDoor", true], [^"UpperDoor", false]]:
+		var door: Door = _house.get_node(check[0]) as Door
+		if door == null:
+			wrong.append("%s is missing" % check[0])
+			continue
+		var body: PhysicsBody3D = door.get_node(door.body_path) as PhysicsBody3D
+		var fadeable: bool = (body.collision_layer & 4) != 0
+		if fadeable != check[1]:
+			wrong.append("%s: body on layers %d, fadeable should be %s"
+				% [check[0], body.collision_layer, check[1]])
+		var zone: Interactable = door.get_node(door.interactable_path) as Interactable
+		if zone.collision_layer != Interactable.LAYER_INTERACTION:
+			wrong.append("%s: interactable on layers %d, wants %d alone"
+				% [check[0], zone.collision_layer, Interactable.LAYER_INTERACTION])
+	print("collision layers: %d parts + 2 doors checked, %d wrong"
 		% [model.get_child_count(), wrong.size()])
 	for line: String in wrong:
 		_fail(line)

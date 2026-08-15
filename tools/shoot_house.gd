@@ -71,6 +71,20 @@ func _run() -> void:
 		await _stand_at(player, rig, terrain, Vector2(at.x, at.z))
 		await _capture("house_%s" % shot)
 
+	# The door as a mechanic: closed with the prompt on offer, then swung open
+	# by a real press of E — the same chain the player's hand goes through.
+	var at_door: Vector3 = house_at + front * 4.3 - side * 1.10
+	_aim(rig, at_door, at_door - front * 10.0)
+	await _stand_at(player, rig, terrain, Vector2(at_door.x, at_door.z))
+	await _capture("door_closed_prompt")
+	Input.action_press("interact")
+	await physics_frame
+	await physics_frame
+	Input.action_release("interact")
+	for _i: int in range(40):
+		await physics_frame
+	await _capture("door_open")
+
 	# Walk in through the front door. The rig is aimed straight down the door's
 	# own axis rather than at the middle of the house: movement is
 	# camera-relative, so aiming at the centre would walk the player diagonally
