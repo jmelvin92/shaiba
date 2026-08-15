@@ -29,11 +29,13 @@ signal noise_made(world_position: Vector3, loudness: float)
 ## Planar speed above which a step counts as running, m/s. Sits between the
 ## walk clip's 1.4 m/s stride and the run's 4.9.
 @export_range(0.5, 8.0, 0.1) var run_speed_threshold: float = 3.0
-## Loudness of a walking step.
-@export_range(-40.0, 6.0, 0.5) var walk_volume_db: float = -7.0
+## Loudness of a walking step. Dropped 7 dB from the first pass (Joshua,
+## 2026-08-15: "very harsh") — steps should sit under doors, fire and
+## interaction sounds, present but never sharp.
+@export_range(-40.0, 6.0, 0.5) var walk_volume_db: float = -14.0
 ## Loudness of a running step. Same samples as walking, a bit louder —
 ## Joshua's design: feet keep their voices at any speed.
-@export_range(-40.0, 6.0, 0.5) var run_volume_db: float = -3.0
+@export_range(-40.0, 6.0, 0.5) var run_volume_db: float = -10.0
 ## Loudness of the crouch shuffle loop — sneaking should be genuinely quiet.
 @export_range(-60.0, 0.0, 0.5) var shuffle_volume_db: float = -18.0
 
