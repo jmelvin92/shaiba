@@ -31,6 +31,16 @@ const FLOOR_PARTS: PackedStringArray = ["ground_floor"]
 const LAYER_WORLD: int = 1
 const LAYER_FADEABLE: int = 5
 
+## What each walkable part sounds like underfoot (Phase 6.6): footstep audio
+## reads the `surface` metadata off whatever collider its ray lands on. The
+## adobe mass — ground slab, stair, walls, roof — is "stone"; the upper storey
+## rides on wooden vigas, so its floor knocks like planks. Parts not named
+## here get the "stone" default, which is right for adobe everywhere.
+const SURFACE_BY_PART: Dictionary = {
+	"upper_slab": "wood",
+}
+const SURFACE_DEFAULT: String = "stone"
+
 ## The imported model.
 @export var model_path: NodePath = ^"Model"
 ## Furnishing instances standing inside the building, if any. Each is its own
@@ -77,6 +87,7 @@ func _ready() -> void:
 		var cutaway_owned: bool = CUTAWAY_PARTS.has(part.name)
 		var fixed: bool = FLOOR_PARTS.has(part.name)
 		_set_layer(part, LAYER_WORLD if cutaway_owned or fixed else LAYER_FADEABLE)
+		_tag_surface(part, String(SURFACE_BY_PART.get(part.name, SURFACE_DEFAULT)))
 		if cutaway_owned:
 			managed.append(visual)
 
@@ -121,6 +132,15 @@ func _set_layer(part: Node, layer: int) -> void:
 		var body: StaticBody3D = child as StaticBody3D
 		if body != null:
 			body.collision_layer = layer
+
+
+## Stamps the footstep-surface tag onto a part's collider (same importer
+## structure as [method _set_layer]).
+func _tag_surface(part: Node, surface: String) -> void:
+	for child: Node in part.get_children():
+		var body: StaticBody3D = child as StaticBody3D
+		if body != null:
+			body.set_meta("surface", surface)
 
 
 ## As above, but for a whole instanced prop, whose meshes sit one level deeper

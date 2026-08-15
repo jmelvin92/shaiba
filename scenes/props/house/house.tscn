@@ -1,6 +1,7 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://scenes/props/house/house.gd" id="1_house"]
+[ext_resource type="Script" path="res://scenes/audio/acoustic_zone.gd" id="15_acoustics"]
 [ext_resource type="PackedScene" path="res://scenes/props/door/door.tscn" id="14_door"]
 [ext_resource type="PackedScene" uid="uid://cov78ohdr8lmr" path="res://assets/models/house.glb" id="2_model"]
 [ext_resource type="Script" path="res://scenes/props/interior_cutaway.gd" id="3_cutaway"]
@@ -55,6 +56,15 @@ collision_layer = 0
 collision_mask = 2
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Cutaway/Interior"]
+shape = SubResource("BoxShape3D_interior")
+
+[node name="AcousticZone" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.88, 0)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("15_acoustics")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AcousticZone"]
 shape = SubResource("BoxShape3D_interior")
 
 [node name="Furnishings" type="Node3D" parent="."]

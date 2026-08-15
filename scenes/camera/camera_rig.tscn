@@ -20,3 +20,6 @@ far = 500.0
 
 [node name="OccluderFader" type="Node" parent="."]
 script = ExtResource("2_fader")
+
+[node name="Listener" type="AudioListener3D" parent="."]
+top_level = true

@@ -26,6 +26,9 @@ extends Node3D
 ## Marker inside the homestead saying where the player arrives. Without it the
 ## player keeps whatever spawn the scene gave them.
 @export var homestead_spawn_path: NodePath = ^"PlayerSpawn"
+## Direct child playing the ambient sound bed, if this level has one. Told to
+## centre its gusts on the player; a level without one skips it.
+@export var ambience_path: NodePath = ^"Ambience"
 
 
 func _ready() -> void:
@@ -38,6 +41,10 @@ func _ready() -> void:
 	camera_rig.yaw_changed.connect(player.set_view_yaw)
 	player.set_view_yaw(camera_rig.get_yaw())
 	camera_rig.set_target(player)
+
+	var ambience: Ambience = get_node_or_null(ambience_path) as Ambience
+	if ambience != null:
+		ambience.set_focus(player)
 
 	var chunk_manager: ChunkManager = get_node_or_null(chunk_manager_path) as ChunkManager
 	if chunk_manager == null:

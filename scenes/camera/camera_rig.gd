@@ -78,6 +78,12 @@ signal yaw_changed(yaw: float)
 @onready var _pitch_pivot: Node3D = $YawPivot/PitchPivot
 @onready var _camera: Camera3D = $YawPivot/PitchPivot/Camera3D
 @onready var _fader: OccluderFader = $OccluderFader
+## The game's ears (Phase 6.6). Kept at the *player's* position, not the
+## camera's — the camera hangs 23 m back, and ears there would make everything
+## sound distant — but turned with the camera's yaw so left/right panning
+## matches the screen. `top_level` in the scene so the rig's own follow and
+## lift never drag it around; this script places it absolutely each tick.
+@onready var _listener: AudioListener3D = $Listener
 
 var _target: Node3D = null
 ## Where the player has zoomed to, before obstruction is considered.
@@ -108,6 +114,7 @@ func _ready() -> void:
 	_camera.position.z = _zoom_current
 	_apply_pitch()
 	_apply_yaw()
+	_listener.make_current()
 
 
 ## Sets the node this rig follows and snaps to it immediately.
@@ -132,6 +139,7 @@ func snap_to_target() -> void:
 		_camera.position.z = _zoom_current
 	_lift = _needed_lift()
 	global_position.y += _lift
+	_update_listener()
 	reset_physics_interpolation()
 
 
@@ -170,6 +178,16 @@ func _physics_process(delta: float) -> void:
 	_camera.position.z = _zoom_current
 	_lift = lerpf(_lift, _needed_lift(), 1.0 - exp(-lift_speed * delta))
 	global_position.y += _lift
+	_update_listener()
+
+
+## Places the ears on the followed target, facing the camera's way. See the
+## note on [member _listener].
+func _update_listener() -> void:
+	if _target == null:
+		return
+	_listener.global_position = _target.global_position + follow_offset
+	_listener.global_rotation = Vector3(0.0, deg_to_rad(yaw_degrees), 0.0)
 
 
 ## How far the camera must rise right now to keep its clearance over the sand.

@@ -18,15 +18,28 @@ signal lit_changed(lit: bool)
 @onready var _flame: FlameLight = $Flame
 @onready var _interactable: Interactable = $Interactable
 
+var _audio: AudioStreamPlayer3D = null
+
 
 func _ready() -> void:
 	_interactable.interacted.connect(_on_interacted)
+	_audio = AudioStreamPlayer3D.new()
+	_audio.bus = &"SFX"
+	_audio.max_distance = 20.0
+	add_child(_audio)
 	_apply()
 
 
 func _on_interacted(_actor: Node3D) -> void:
 	lit = not lit
 	lit_changed.emit(lit)
+	var stream: AudioStream = SoundBank.stream(
+		"fire/lamp_light.wav" if lit else "fire/lamp_snuff.wav"
+	)
+	if stream != null:
+		if _audio.stream != stream:
+			_audio.stream = stream
+		_audio.play()
 
 
 func _apply() -> void:

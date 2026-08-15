@@ -45,6 +45,10 @@ var _open: bool = false
 ## Which way the current/last opening swung: +1 toward local -Z, -1 toward +Z.
 var _swing_sign: float = 1.0
 var _target_degrees: float = 0.0
+var _audio: AudioStreamPlayer3D = null
+## True while a closing swing still owes its latch thud (played on settle —
+## the creak belongs to the swing's start, the thud to its end).
+var _latch_pending: bool = false
 
 
 func _ready() -> void:
@@ -53,6 +57,10 @@ func _ready() -> void:
 		push_warning("Door: no leaf at %s; nothing to swing." % leaf_path)
 		set_physics_process(false)
 		return
+	_audio = AudioStreamPlayer3D.new()
+	_audio.bus = &"SFX"
+	_audio.max_distance = 25.0
+	add_child(_audio)
 	_interactable = get_node_or_null(interactable_path) as Interactable
 	if _interactable != null:
 		_interactable.interacted.connect(_on_interacted)
@@ -70,6 +78,9 @@ func _physics_process(delta: float) -> void:
 	degrees = move_toward(degrees, _target_degrees, step)
 	_leaf.rotation.y = deg_to_rad(degrees)
 	if is_equal_approx(degrees, _target_degrees):
+		if _latch_pending:
+			_latch_pending = false
+			_play(SoundBank.take_set("doors/door_close"))
 		# Settled: a standing door costs nothing, per the Phase 5 idle rule.
 		set_physics_process(false)
 
@@ -86,8 +97,15 @@ func set_open(open: bool, instant: bool = false) -> void:
 	_update_prompt()
 	toggled.emit(open)
 	if instant and _leaf != null:
+		# Level-script/harness teleports of the leaf are silent by design.
+		_latch_pending = false
 		_leaf.rotation.y = deg_to_rad(_target_degrees)
 		return
+	if open:
+		_latch_pending = false
+		_play(SoundBank.take_set("doors/door_open"))
+	else:
+		_latch_pending = true
 	set_physics_process(true)
 
 
@@ -123,6 +141,14 @@ func _on_interacted(actor: Node3D) -> void:
 func _update_prompt() -> void:
 	if _interactable != null:
 		_interactable.prompt = "Close" if _open else "Open"
+
+
+func _play(takes: AudioStreamRandomizer) -> void:
+	if takes == null or _audio == null:
+		return
+	if _audio.stream != takes:
+		_audio.stream = takes
+	_audio.play()
 
 
 func _collect_visuals(root: Node, into: Array[GeometryInstance3D]) -> void:

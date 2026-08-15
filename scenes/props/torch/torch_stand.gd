@@ -23,12 +23,18 @@ var _carry_transform: Transform3D = Transform3D(
 @onready var _torch: Torch = $Torch
 @onready var _interactable: Interactable = $Interactable
 
+var _audio: AudioStreamPlayer3D = null
+
 
 func _ready() -> void:
 	_interactable.interacted.connect(_on_interacted)
 	_torch.transform = _rest_transform
 	_torch.lit = false
 	_interactable.prompt = "Take torch"
+	_audio = AudioStreamPlayer3D.new()
+	_audio.bus = &"SFX"
+	_audio.max_distance = 25.0
+	add_child(_audio)
 
 
 func _on_interacted(actor: Node3D) -> void:
@@ -40,8 +46,18 @@ func _on_interacted(actor: Node3D) -> void:
 		_torch.transform = _carry_transform
 		_torch.lit = true
 		_interactable.prompt = "Return torch"
+		_play(SoundBank.stream("fire/torch_take.wav"))
 	elif _torch.get_parent() == socket:
 		_torch.reparent(self, false)
 		_torch.transform = _rest_transform
 		_torch.lit = false
 		_interactable.prompt = "Take torch"
+		_play(SoundBank.stream("fire/torch_return.wav"))
+
+
+func _play(stream: AudioStream) -> void:
+	if stream == null:
+		return
+	if _audio.stream != stream:
+		_audio.stream = stream
+	_audio.play()

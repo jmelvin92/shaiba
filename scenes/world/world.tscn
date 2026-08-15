@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scenes/world/level_root.gd" id="1_level"]
 [ext_resource type="PackedScene" path="res://scenes/world/desert_environment.tscn" id="2_env"]
@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" path="res://scenes/camera/camera_rig.tscn" id="7_camera"]
 [ext_resource type="PackedScene" path="res://scenes/world/terrain/sand_deformation.tscn" id="8_sand"]
 [ext_resource type="PackedScene" path="res://scenes/world/homestead.tscn" id="9_homestead"]
+[ext_resource type="PackedScene" path="res://scenes/audio/ambience.tscn" id="10_ambience"]
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_level")
@@ -31,3 +32,5 @@ unload_radius = 6
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
 
 [node name="CameraRig" parent="." instance=ExtResource("7_camera")]
+
+[node name="Ambience" parent="." instance=ExtResource("10_ambience")]

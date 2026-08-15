@@ -14,3 +14,5 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
 script = ExtResource("3_flame")
 light_range = 9.0
 base_energy = 1.9
+loop_sound_path = "fire/torch_loop.ogg"
+loop_volume_db = -4.0

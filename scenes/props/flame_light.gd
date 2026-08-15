@@ -34,9 +34,15 @@ const FLAME_COLOR: Color = Color("FFC873")
 ## its light so windows and the doorway shape it); a carried torch may switch
 ## it off if profiling ever demands.
 @export var shadows: bool = true
+## The flame's voice: a [SoundBank] path under assets/audio (e.g.
+## "fire/torch_loop.ogg") looping while lit, silent while snuffed. Empty = a
+## mute flame; a path whose file isn't sourced yet behaves the same.
+@export var loop_sound_path: String = ""
+@export_range(-40.0, 6.0, 0.5) var loop_volume_db: float = -6.0
 
 var _light: OmniLight3D = null
 var _flame: MeshInstance3D = null
+var _audio: AudioStreamPlayer3D = null
 var _noise: FastNoiseLite = FastNoiseLite.new()
 var _time: float = 0.0
 
@@ -70,6 +76,19 @@ func _ready() -> void:
 	_flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_flame)
 
+	if loop_sound_path != "":
+		var loop: AudioStream = SoundBank.stream(loop_sound_path, true)
+		if loop != null:
+			_audio = AudioStreamPlayer3D.new()
+			_audio.stream = loop
+			_audio.bus = &"SFX"
+			_audio.volume_db = loop_volume_db
+			_audio.max_distance = light_range * 3.0
+			# Doppler on: a carried torch's crackle shifts as you sprint past a
+			# stand, and it costs nothing while nothing moves.
+			_audio.doppler_tracking = AudioStreamPlayer3D.DOPPLER_TRACKING_PHYSICS_STEP
+			add_child(_audio)
+
 	_apply_lit()
 
 
@@ -93,3 +112,8 @@ func _apply_lit() -> void:
 	_light.visible = lit
 	_flame.visible = lit
 	set_physics_process(lit)
+	if _audio != null:
+		if lit and not _audio.playing:
+			_audio.play()
+		elif not lit and _audio.playing:
+			_audio.stop()

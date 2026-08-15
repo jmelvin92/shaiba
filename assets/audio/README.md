@@ -1,9 +1,10 @@
 # Sound sourcing checklist
 
-Drop sourced files into these folders using the exact names below, then run
-`tools/build_audio_libraries.py` (or ask Claude) — the audio libraries rebuild
-themselves from whatever files exist. Missing sounds are simply silent; nothing
-breaks, nothing needs wiring by hand.
+Drop sourced files into these folders using the exact names below — the game
+wires them up by itself at launch from the naming convention. Missing sounds
+are simply silent; nothing breaks, nothing needs wiring by hand. (New files do
+need one Godot import pass before a run picks them up: opening the editor does
+it, or ask Claude to relaunch the game.)
 
 ## Format rules (apply to everything)
 
@@ -25,9 +26,9 @@ breaks, nothing needs wiring by hand.
 | `sand_run_01..04+.wav` | Same sand, heavier and faster impact |
 | `packed_walk_01..04+.wav` | Firm packed earth (the courtyard) — drier, harder than sand |
 | `packed_run_01..04+.wav` | Packed earth at a run |
-| `stone_walk_01..04+.wav` | Interior adobe/stone floor — hard, slight room to it is OK to fake later, record dry |
+| `stone_walk_01..04+.wav` | Hard adobe/stone — the ground floor and the outside stair. Record dry |
 | `stone_run_01..04+.wav` | Stone at a run |
-| `wood_walk_01..04+.wav` | Wooden stair treads / upper floor — hollow knock |
+| `wood_walk_01..04+.wav` | Upper-storey plank floor — hollow wooden knock |
 | `wood_run_01..04+.wav` | Wood at a run |
 
 ## movement/

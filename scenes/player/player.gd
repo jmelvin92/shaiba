@@ -119,6 +119,11 @@ signal landed(impact_speed: float)
 signal stamped(
 	world_xz: Vector2, radius: float, strength: float, angle: float, stretch: float
 )
+## Emitted whenever the player makes an audible amount of noise (a step, a
+## jump, a landing) — re-raised from the FootstepAudio child so future
+## listeners (a startled camel, a night creature) only ever wire against the
+## player. Nothing connects it yet.
+signal noise_made(world_position: Vector3, loudness: float)
 
 ## Yaw of the viewing camera, radians. Input is rotated by this so "W" always
 ## means "away from the camera".
@@ -134,6 +139,7 @@ var _terrain: TerrainSettings = null
 @onready var _animator: PlayerAnimator = $AnimationTree
 @onready var _visual: Node3D = $Visual
 @onready var _stamper: FootstepStamper = $FootstepStamper
+@onready var _footsteps: FootstepAudio = $FootstepAudio
 
 ## Full standing capsule height, taken from the scene at load.
 var _stand_height: float = 1.75
@@ -182,6 +188,11 @@ func _ready() -> void:
 		func(at: Vector2, radius: float, strength: float, angle: float, stretch: float) -> void:
 			stamped.emit(at, radius, strength, angle, stretch)
 	)
+	_stamper.foot_planted.connect(_footsteps.on_foot_planted)
+	_footsteps.noise_made.connect(
+		func(world_position: Vector3, loudness: float) -> void:
+			noise_made.emit(world_position, loudness)
+	)
 
 
 ## Called by the level that owns both this player and the camera rig.
@@ -192,6 +203,7 @@ func set_view_yaw(yaw: float) -> void:
 ## Called by a level that has terrain, so movement can feel the sand depth.
 func set_terrain(terrain: TerrainSettings) -> void:
 	_terrain = terrain
+	_footsteps.set_terrain(terrain)
 
 
 func _physics_process(delta: float) -> void:
@@ -257,9 +269,11 @@ func _physics_process(delta: float) -> void:
 		_animator.play_land(_fall_speed)
 		landed.emit(_fall_speed)
 		_stamper.notify_landed(_fall_speed)
+		_footsteps.on_landed(_fall_speed)
 	_was_on_floor = footed
 	_animator.set_locomotion(_planar_speed, footed, _crouched)
 	_stamper.tick(delta, velocity, footed, _sand_factor())
+	_footsteps.tick(delta, _planar_speed, _crouched, footed)
 
 
 ## The pace being asked for: crouching beats sprinting, sprinting beats
@@ -384,6 +398,7 @@ func _update_jump(delta: float) -> void:
 		_coyote_left = 0.0
 		_animator.play_jump()
 		jumped.emit()
+		_footsteps.on_jumped()
 	elif Input.is_action_just_released("jump") and velocity.y > 0.0:
 		# Released mid-rise — cut it short once, so a tap is a smaller hop.
 		velocity.y *= jump_release_damping
