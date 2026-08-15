@@ -15,7 +15,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 2 | Camera & movement (gray-box) | `feature/phase-2-camera-movement` | ✅ Done (2026-08-13) |
 | 3 | Character model & animation | `feature/phase-3-character` | ✅ Done (2026-08-13) |
 | 4 | Terrain & chunk streaming | `feature/phase-4-terrain` | ✅ Done (2026-08-13) |
-| 5 | Sand footprint physics | `feature/phase-5-footprints` | 🔲 Not started |
+| 5 | Sand footprint physics | `feature/phase-5-footprints` | ✅ Done (2026-08-14) |
 | 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🔲 Not started |
 | 7 | Integration & polish → v0.1 | `feature/phase-7-polish` | 🔲 Not started |
 
@@ -166,12 +166,19 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 - Hooks for the future: any object (camel, dragged items) can register as a "sand stamper" — small, clean interface.
 
 **Quality Gate**
-- [ ] Footprints visually match foot placement at walk and run; look correct from the gameplay camera in both direct light and shadow.
-- [ ] Print depth visibly varies with sand depth: a trail crossing deep drift → thin skin → hard ground reads deep → faint → gone.
-- [ ] No shimmer/artifacts at the deformation region boundary as it follows the player across chunk borders.
-- [ ] Frame cost of the whole system ≤ 1 ms on this Mac; zero cost when standing still.
-- [ ] Prints fade smoothly; walking a circle and returning shows believable partial fading.
-- [ ] PLAN.md updated; merged to `development`.
+- [x] Footprints visually match foot placement at walk and run; look correct from the gameplay camera in both direct light and shadow. *(Stamps come from the toe bones at the measured foot-plant moment; `verify_prints` asserts every footfall reads back from the deformation texture at the bone's position and the sand off-trail stays clean. Screenshot-checked at the gameplay camera on lit sand and across the shadowed dune band; Joshua reviewed the look on the Footprint Ladder and approved darkness 0.55 / depth 0.12 m.)*
+- [x] Print depth visibly varies with sand depth: a trail crossing deep drift → thin skin → hard ground reads deep → faint → gone. *(Scripted 42 m walk from a 1.52 m drift down to 0.65 m skin, screenshot-verified: bold prints fading along the depth gradient. The cap saturates at 0.3 m of sand and hits zero on bare ground by construction — vertex alpha carries the depth, `tools/shoot_prints.gd` reproduces the evidence.)*
+- [x] No shimmer/artifacts at the deformation region boundary as it follows the player across chunk borders. *(Recentres move the region in whole texels only, so carried content is copied texel-for-texel, never resampled — `verify_prints` asserts a marked point survives repeated recentres bit-cleanly, and an isolation harness held a stamp through 6 recentres at 0.998→0.984 (pure decay). The wind drift shares the same whole-texel mechanism.)*
+- [x] Frame cost of the whole system ≤ 1 ms on this Mac; zero cost when standing still. *(`verify_prints`: worst main-thread pass 0.8 ms across ~690 passes — and a pass only runs when something changed; the harness asserts the pass counter stops climbing once prints have fully faded, so standing still costs exactly zero.)*
+- [x] Prints fade smoothly; walking a circle and returning shows believable partial fading. *(Scripted octagon loop on deep sand: at the moment of return the oldest prints are already visibly softer than the newest — a fade gradient around one loop — and 90 s later the loop is mostly refilled, its remnant drifted slightly downwind. Decay-to-empty and return-to-zero-cost are asserted by `verify_prints`.)*
+- [x] PLAN.md updated; merged to `development`.
+
+**Notes for later phases**
+- **The stamper interface is one signal + one connect:** a stamper emits `stamped(world_xz, radius, strength, angle, stretch)`, the level connects it to `SandDeformation.stamp()`. Phase 6's camel gets tracks by giving it a stamper child (its own gait logic) and one `connect` in the level — see `scenes/player/footstep_stamper.gd` as the worked example.
+- **Tuning approved by Joshua (2026-08-14)** from the Footprint Ladder: `tint_strength` 0.55, `max_print_depth` 0.12 m, `fade_seconds` 180. All exports on `SandDeformation`.
+- **Biome readiness is a recorded contract** (DECISIONS 2026-08-14): prints gate on vertex COLOR.a = depressible depth (material-agnostic), and the deformation texture's G channel is reserved for future per-material decay classes. Don't repurpose it.
+- **verify tooling:** `tools/verify_prints.gd` (windowed) is the phase gate as an executable; `tools/shoot_prints.gd` and `tools/shoot_print_ladder.gd` reproduce the visual evidence. Wind drift moves prints by design — tests probing fixed points must disable it (the harness does).
+- The crouch leaves no prints (crouched feet never "plant" — they slide); consistent with the Phase 3 crouch-walk gap, worth revisiting if crouch clips ever arrive.
 
 ## Phase 6 — Environment assets (house & camel)
 

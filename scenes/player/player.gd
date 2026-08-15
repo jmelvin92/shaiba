@@ -88,7 +88,7 @@ const STEP_CLEARANCE: float = 0.02
 @export_group("Sand")
 ## Sand depth at which the deep-sand effects reach full strength, metres.
 ## Shallower sand scales every effect down proportionally.
-@export_range(0.05, 2.0, 0.05) var deep_sand_depth: float = 0.4
+@export_range(0.05, 2.0, 0.05) var deep_sand_depth: float = 1.5
 ## Multiplier on movement speed when the sand is fully deep — wading through
 ## a dune should cost something.
 @export_range(0.2, 1.0, 0.05) var deep_sand_speed_scale: float = 0.6
@@ -107,6 +107,13 @@ const STEP_CLEARANCE: float = 0.02
 signal jumped
 ## Emitted on touchdown, carrying the downward speed at impact in m/s.
 signal landed(impact_speed: float)
+## Emitted whenever the feet mark the sand (footfall, deep-sand drag,
+## landing splat) — re-raised from the FootstepStamper child so levels only
+## ever wire against the player. Position/radius in world metres, strength
+## 0–1, angle radians, stretch elongates the mark along its angle.
+signal stamped(
+	world_xz: Vector2, radius: float, strength: float, angle: float, stretch: float
+)
 
 ## Yaw of the viewing camera, radians. Input is rotated by this so "W" always
 ## means "away from the camera".
@@ -121,6 +128,7 @@ var _terrain: TerrainSettings = null
 @onready var _capsule: CapsuleShape3D = _collision.shape
 @onready var _animator: PlayerAnimator = $AnimationTree
 @onready var _visual: Node3D = $Visual
+@onready var _stamper: FootstepStamper = $FootstepStamper
 
 ## Full standing capsule height, taken from the scene at load.
 var _stand_height: float = 1.75
@@ -156,6 +164,11 @@ func _ready() -> void:
 	floor_snap_length = maxf(floor_snap_length, max_step_height + 0.05)
 	_stand_height = _capsule.height
 	_current_height = _stand_height
+	_stamper.setup(_visual.find_child("Skeleton3D", true, false) as Skeleton3D)
+	_stamper.stamped.connect(
+		func(at: Vector2, radius: float, strength: float, angle: float, stretch: float) -> void:
+			stamped.emit(at, radius, strength, angle, stretch)
+	)
 
 
 ## Called by the level that owns both this player and the camera rig.
@@ -230,8 +243,10 @@ func _physics_process(delta: float) -> void:
 	if footed and not _was_on_floor:
 		_animator.play_land(_fall_speed)
 		landed.emit(_fall_speed)
+		_stamper.notify_landed(_fall_speed)
 	_was_on_floor = footed
 	_animator.set_locomotion(_planar_speed, footed, _crouched)
+	_stamper.tick(delta, velocity, footed, _sand_factor())
 
 
 ## The pace being asked for: crouching beats sprinting, sprinting beats
