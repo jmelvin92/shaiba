@@ -7,6 +7,10 @@ extends CanvasLayer
 
 @onready var _label: Label = $Label
 
+## The Game autoload, fetched the guarded way so the scene stays standalone-
+## safe and the script compiles outside a running project (--check-only).
+@onready var _game: Node = get_node_or_null(^"/root/Game")
+
 ## Worst process frame seen in the current one-second window, and the window
 ## it was measured over — "worst 12 ms" is what a hitch looks like on a
 ## readout, where an instantaneous number would blink past.
@@ -35,3 +39,6 @@ func update_stats(
 			frame_ms, _shown_worst_ms, roundi(Performance.get_monitor(Performance.TIME_FPS))]
 		+ "static mem %.0f MB" % (Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0)
 	)
+	if _game != null:
+		_label.text += "\ntime %s   day %d   %s" % [
+			_game.clock_text(), _game.day_count, _game.period]

@@ -17,11 +17,12 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 4 | Terrain & chunk streaming | `feature/phase-4-terrain` | ✅ Done (2026-08-13) |
 | 5 | Sand footprint physics | `feature/phase-5-footprints` | ✅ Done (2026-08-14) |
 | 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🟡 In progress — Part 1 + door/interaction system done (awaiting look review), Part 2 needs Meshy assets |
+| 6.5 | Game clock, day-night cycle & lighting (side-track) | `feature/daynight-lighting` | 🟡 In progress — piece 1 (game clock) built & gate-verified 2026-08-14; piece 2 (day-night cycle) next |
 | 7 | Integration & polish → v0.1 | `feature/phase-7-polish` | 🔲 Not started |
 
 Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `development` · ✅ Done (merged, gate passed)
 
-**Later (out of scope for now):** survival systems (hunger/thirst/heat), day-night cycle, inventory, NPCs/dialogue, save games, sound design. Do not build these early "while we're in there" — but do leave clean extension points.
+**Later (out of scope for now):** survival systems (hunger/thirst/heat), inventory, NPCs/dialogue, save games, sound design. Do not build these early "while we're in there" — but do leave clean extension points. *(The day-night cycle was on this list; Joshua pulled it forward on 2026-08-14 — see Phase 6.5.)*
 
 ---
 
@@ -259,6 +260,45 @@ Blocked on Joshua generating in Meshy: a rigged **camel** (`idle` + `walk`) and 
 - [ ] All assets: .blend + .glb committed, correct collision, no errors, stable 60 fps+ with everything on screen.
 - [ ] Interior reads clearly at the gameplay camera: walking in and out never leaves the player hidden or the roof stuck faded.
 - [ ] PLAN.md updated; merged to `development`.
+
+## Phase 6.5 — Game clock, day-night cycle & lighting enhancements (side-track)
+
+**Added 2026-08-14 at Joshua's direction** — a deliberate stray from the original roadmap while he generates Phase 6 Part 2 assets in parallel. The day-night cycle was on the "later" list; it moves up now. Three pieces, each **planned out with Joshua before any build**, tackled strictly in order (each is the foundation of the next):
+
+1. **Game clock** — the timekeeping backbone: time-of-day state, tunable day length, signals for anything that reacts to time. No visuals of its own; everything later (sun, sky, lamps, future survival mechanics) reads from this one source.
+2. **Day-night cycle** — the sun actually travels: sun angle/color/energy, sky gradient, ambient and haze all keyed to the clock, so dawn, noon, dusk and night each read correctly in the palette.
+3. **Lighting enhancements** — the polish layer the cycle exposes: interior light (the oil lamp finally earns its `OmniLight3D`), shadow tuning, night visibility, whatever laddering the cycle reveals. This subsumes part of Phase 7's "full lighting pass" — record what's covered so Phase 7 reconciles rather than redoes.
+
+Deliverables and a quality gate are filled in **per piece at its planning session** (this keeps the phase honest — no gate written before the design conversation that defines it).
+
+### Piece 1 — Game clock (planned & built 2026-08-14; gate passed)
+
+**Joshua's three calls at planning:** one full day = **24 real minutes** (1 real minute = 1 game hour); the game starts at **16:00** so every launch opens on the signature golden-hour look; time readout is **debug-only** (F3 overlay + debug keys — no HUD clock until a real UI phase).
+
+**Design (the plain-terms version):** the clock is a small piece of *game state*, not a lighting feature — so it lives in the existing `Game` autoload, which Phase 1 explicitly reserved for exactly this kind of growth (no new autoload needed). Everything that reacts to time — the sun in piece 2, the oil lamp in piece 3, survival mechanics someday — reads from this one source, so time can never disagree with itself.
+
+**Deliverables**
+- `autoload/game.gd` grows the clock: `time_of_day` in hours (0–24, wraps; `day_count` increments at midnight), advancing every frame scaled by `day_length_minutes` (24.0), starting at `start_hour` (16.0). All tunables typed vars with the usual export treatment.
+- Helpers the later pieces were designed against: `normalized_time` (0–1 around the full day), `is_daytime`, and a formatted `clock_text` ("16:42") for overlays.
+- Signals for *discrete* reactions: `hour_passed(hour: int)` and `period_changed(period)` over four named periods (night / dawn / day / dusk, boundaries as constants). Continuous consumers (the moving sun) sample `time_of_day` directly each frame — smooth motion never rides on signals.
+- Clock ticks in `_process` (it isn't physical, and this makes it respect pause for free); `time_paused` bool for cutscene/debug freezing.
+- Debug affordances: current time + day on the F3 overlay, plus `debug_time_forward`/`debug_time_back` input actions (scrub time quickly) — essential for piece 2's lighting ladders as much as for testing.
+- `tools/verify_clock.gd` (headless): a scaled run asserts the day length lands within tolerance, wrap increments `day_count`, `hour_passed` fires exactly once per hour in order, `period_changed` fires at the constant boundaries, and pausing halts time.
+
+**Quality gate** *(all verified 2026-08-14 by `tools/verify_clock.gd` — headless, instantiates the clock and drives it through a simulated day of 60 Hz frames)*
+- [x] A full day takes 24±0.1 real minutes; launch shows 16:00; midnight wrap increments `day_count`. *(Simulated frame time to the 24th `hour_passed`: 24.000 real minutes; launch state 16:00 / day 0 / "day" asserted.)*
+- [x] Signals fire exactly once per boundary, in order, including across the midnight wrap. *(All 24 hours in order 17→16; period trail exactly dusk→night→dawn→day; landing exactly on a boundary fires once and never re-fires.)*
+- [x] F3 overlay shows time/day; debug scrub keys move time both ways; `time_paused` freezes it. *(The overlay scene renders "time 09:30 day 0 day" from a clock instance; the scrub test injects real `]`/`[` key events through `Input.parse_input_event`, so the project.godot InputMap bindings themselves are what passed; pause held 16:00 through 600 frames while scrub deliberately still works.)*
+- [x] Zero warnings (`--check-only`), `--import` clean, graybox and world both still run standalone; `verify_player`/`verify_terrain` untouched and green. *(All re-run after the change.)*
+- [x] DECISIONS.md entry: the clock lives in `Game` (why no new node/autoload), day length + start hour rationale.
+
+**Constraints already binding on the planning sessions:**
+- The palette rule holds at night: night tones lean on `night_blue`; any genuinely new color (a night sky, moonlight) is an ART_DIRECTION discussion + DECISIONS entry, not an improvisation.
+- The 19° camera's warm distance haze is tuned for late afternoon; the cycle must keep the horizon melt (real terrain dissolving into sky) working at every hour — the streaming edge must never become visible at night.
+- The "warm late-afternoon" identity in ART_DIRECTION is the game's signature look; the cycle should treat it as the golden hour the day passes *through*, not discard it.
+- Visual tuning (sky colors, sun angles, night darkness) goes through same-vantage screenshot ladders for Joshua's picks, per the established pattern.
+
+**Planning status:** clock ✅ built & verified · cycle 🔲 · lighting 🔲
 
 ## Phase 7 — Integration & polish → v0.1
 
