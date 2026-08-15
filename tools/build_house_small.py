@@ -47,7 +47,6 @@ import os
 import sys
 
 import bpy
-from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -113,151 +112,7 @@ def preview_tag() -> str:
     return "" if WALL == DEFAULT_WALL else "_" + WALL
 
 
-# --- arches ------------------------------------------------------------------
-
-def arc_points(
-    centre_x: float, springing: float, radius: float, steps: int,
-    start: float = 0.0, end: float = math.pi,
-) -> list[tuple[float, float]]:
-    """Points along an arch, from `start` to `end` radians (0 = right springing,
-    pi = left). Returned as (x, z)."""
-    return [
-        (
-            centre_x + radius * math.cos(start + (end - start) * i / steps),
-            springing + radius * math.sin(start + (end - start) * i / steps),
-        )
-        for i in range(steps + 1)
-    ]
-
-
-def prism(
-    part: Part, profile: list[tuple[float, float]], axis: str,
-    outer: float, inner: float, material: str,
-) -> None:
-    """A closed solid from a (span, z) profile extruded through a wall.
-
-    The one shape a stack of boxes cannot make cleanly — here, the spandrel
-    between an arch and the square opening it sits in. `axis` is the wall's
-    normal, matching adobe.wall_with_openings, and `profile`'s first coordinate
-    is the wall's span direction.
-
-    Two things are normalised rather than trusted to the caller, because both
-    were wrong on the first pass and neither is visible in a solid render:
-
-    * The profile is re-wound counter-clockwise. Mirrored pairs are where
-      hand-wound profiles go wrong — this arch's left spandrel came out
-      clockwise while its right came out counter-clockwise, inverting one.
-    * The extrusion runs a different way for each axis. (span, z, x) is
-      right-handed where (span, z, y) is left-handed, so the same winding that
-      faces outward on a front wall faces inward on a side wall.
-    """
-    twice_area = sum(
-        profile[i][0] * profile[(i + 1) % len(profile)][1]
-        - profile[(i + 1) % len(profile)][0] * profile[i][1]
-        for i in range(len(profile))
-    )
-    if twice_area < 0.0:
-        profile = list(reversed(profile))
-
-    a0, a1 = min(outer, inner), max(outer, inner)
-    if axis == "x":
-        a0, a1 = a1, a0
-
-    def vert(span: float, across: float, z: float) -> Vector:
-        return Vector((across, span, z)) if axis == "x" else Vector((span, across, z))
-
-    count = len(profile)
-    base = len(part.verts)
-    for span, z in profile:
-        part.verts.append(vert(span, a0, z))
-    for span, z in profile:
-        part.verts.append(vert(span, a1, z))
-
-    for i in range(count):
-        j = (i + 1) % count
-        part.faces.append((base + i, base + count + i, base + count + j, base + j))
-        part.face_materials.append(material)
-
-    part.faces.append(tuple(range(base + count - 1, base - 1, -1)))
-    part.face_materials.append(material)
-    part.faces.append(tuple(range(base + count, base + 2 * count)))
-    part.face_materials.append(material)
-
-
-def arched_opening(
-    part: Part, axis: str, centre: float, springing: float, radius: float,
-    outer: float, inner: float, material: str,
-) -> None:
-    """Turns a square-headed opening into an arched one.
-
-    The wall is cut as a plain rectangle up to the arch's crown — which
-    `wall_with_openings` can already do — and these two spandrels then fill the
-    upper corners back in, leaving the arch. Much cheaper than cutting a curve,
-    and every face stays a flat quad.
-    """
-    crown = springing + radius
-    right = arc_points(centre, springing, radius, ARCH_STEPS, 0.0, math.pi / 2.0)
-    left = arc_points(centre, springing, radius, ARCH_STEPS, math.pi / 2.0, math.pi)
-    # The arc, then out to the square corner. prism re-winds each one.
-    prism(part, right + [(centre + radius, crown)], axis, outer, inner, material)
-    prism(part, left + [(centre - radius, crown)], axis, outer, inner, material)
-
-
-def arch_band(
-    part: Part, centre_x: float, springing: float,
-    inner_r: float, outer_r: float, y0: float, y1: float, material: str,
-) -> None:
-    """The protruding arched surround: a band swept over the arch, rectangular
-    in section. Built by stitching consecutive cross-sections, the same way the
-    palm's trunk stitches its rings."""
-    inner = arc_points(centre_x, springing, inner_r, ARCH_STEPS * 2)
-    outer = arc_points(centre_x, springing, outer_r, ARCH_STEPS * 2)
-    base = len(part.verts)
-    for (ix, iz), (ox, oz) in zip(inner, outer):
-        part.verts.extend([
-            Vector((ix, y0, iz)), Vector((ox, y0, oz)),
-            Vector((ox, y1, oz)), Vector((ix, y1, iz)),
-        ])
-    sections = len(inner)
-    for i in range(sections - 1):
-        a = base + i * 4
-        b = base + (i + 1) * 4
-        for k in range(4):
-            k2 = (k + 1) % 4
-            part.faces.append((a + k, b + k, b + k2, a + k2))
-            part.face_materials.append(material)
-    part.faces.append((base, base + 3, base + 2, base + 1))
-    part.face_materials.append(material)
-    last = base + (sections - 1) * 4
-    part.faces.append((last, last + 1, last + 2, last + 3))
-    part.face_materials.append(material)
-
-
 # --- details -----------------------------------------------------------------
-
-def stone_patch(
-    part: Part, axis: str, face: float, outward: float,
-    centre: tuple[float, float], stones: list[tuple[float, float, float, float]],
-) -> None:
-    """A patch where the plaster has fallen away. Each stone stands a
-    centimetre or two proud, so flat shading catches an edge on it rather than
-    leaving a flat decal that reads as a stain."""
-    for ds, dz, w, h in stones:
-        s0, s1 = centre[0] + ds, centre[0] + ds + w
-        z0, z1 = centre[1] + dz, centre[1] + dz + h
-        near, far = sorted((face, face + outward * 0.035))
-        if axis == "x":
-            part.box((near, s0, z0), (far, s1, z1), STONE)
-        else:
-            part.box((s0, near, z0), (s1, far, z1), STONE)
-
-
-PATCH_STONES = [
-    (0.00, 0.00, 0.22, 0.15), (0.24, 0.03, 0.17, 0.13),
-    (0.05, 0.17, 0.19, 0.14), (0.26, 0.19, 0.20, 0.12),
-    (0.14, 0.33, 0.16, 0.11),
-]
-
 
 def arched_window(
     part: Part, axis: str, outer: float, inner: float, centre_s: float,
@@ -313,9 +168,10 @@ def build_walls(materials: dict) -> list[bpy.types.Object]:
     adobe.wall_with_openings(
         front, "y", HALF_Y, inner_y, (-HALF_X, HALF_X), (0.0, PARAPET_TOP),
         [(door[0], door[1], 0.0, DOOR_CROWN)], WALL)
-    arched_opening(front, "y", 0.0, DOOR_SPRING, DOOR_R, HALF_Y, inner_y, WALL)
-    arch_band(front, 0.0, DOOR_SPRING, DOOR_R, DOOR_R + PORTAL_BAND,
-              HALF_Y, HALF_Y + PORTAL_OUT, SURROUND)
+    adobe.arched_opening(front, "y",
+        adobe.round_arch(0.0, DOOR_SPRING, DOOR_R, ARCH_STEPS), HALF_Y, inner_y, WALL)
+    adobe.arch_band(front, 0.0, DOOR_SPRING, DOOR_R, DOOR_R + PORTAL_BAND,
+                    HALF_Y, HALF_Y + PORTAL_OUT, SURROUND)
     for side in (-1.0, 1.0):
         front.box((side * DOOR_R, HALF_Y, 0.0),
                   (side * (DOOR_R + PORTAL_BAND), HALF_Y + PORTAL_OUT,
@@ -327,13 +183,14 @@ def build_walls(materials: dict) -> list[bpy.types.Object]:
     # well. A doorway is a hole. It stays a hole.
     adobe.vigas(front, "y", HALF_Y, (-HALF_X, HALF_X), CEILING - 0.30, 6, 1.0,
                 TRIM, skip=(-1.2, 1.2))
-    stone_patch(front, "y", HALF_Y, 1.0, (-2.55, 1.05), PATCH_STONES)
+    adobe.stone_patch(front, "y", HALF_Y, 1.0, (-2.55, 1.05), STONE)
 
     back = Part("wall_back")
     adobe.wall_with_openings(
         back, "y", -HALF_Y, -inner_y, (-HALF_X, HALF_X), (0.0, PARAPET_TOP),
         [(-0.9 - WIN_R, -0.9 + WIN_R, WIN_SILL, WIN_CROWN)], WALL)
-    arched_opening(back, "y", -0.9, WIN_SPRING, WIN_R, -HALF_Y, -inner_y, WALL)
+    adobe.arched_opening(back, "y",
+        adobe.round_arch(-0.9, WIN_SPRING, WIN_R, ARCH_STEPS), -HALF_Y, -inner_y, WALL)
     arched_window(back, "y", -HALF_Y, -inner_y, -0.9)
     adobe.vigas(back, "y", -HALF_Y, (-HALF_X, HALF_X), CEILING - 0.30, 6, -1.0,
                 TRIM)
@@ -342,17 +199,19 @@ def build_walls(materials: dict) -> list[bpy.types.Object]:
     adobe.wall_with_openings(
         left, "x", -HALF_X, -inner_x, (-HALF_Y, HALF_Y), (0.0, PARAPET_TOP),
         [(0.55 - WIN_R, 0.55 + WIN_R, WIN_SILL, WIN_CROWN)], WALL)
-    arched_opening(left, "x", 0.55, WIN_SPRING, WIN_R, -HALF_X, -inner_x, WALL)
+    adobe.arched_opening(left, "x",
+        adobe.round_arch(0.55, WIN_SPRING, WIN_R, ARCH_STEPS), -HALF_X, -inner_x, WALL)
     arched_window(left, "x", -HALF_X, -inner_x, 0.55)
     adobe.vigas(left, "x", -HALF_X, (-HALF_Y, HALF_Y), CEILING - 0.30, 5, -1.0,
                 TRIM)
-    stone_patch(left, "x", -HALF_X, -1.0, (-1.85, 1.95), PATCH_STONES)
+    adobe.stone_patch(left, "x", -HALF_X, -1.0, (-1.85, 1.95), STONE)
 
     right = Part("wall_right")
     adobe.wall_with_openings(
         right, "x", HALF_X, inner_x, (-HALF_Y, HALF_Y), (0.0, PARAPET_TOP),
         [(-0.35 - WIN_R, -0.35 + WIN_R, WIN_SILL, WIN_CROWN)], WALL)
-    arched_opening(right, "x", -0.35, WIN_SPRING, WIN_R, HALF_X, inner_x, WALL)
+    adobe.arched_opening(right, "x",
+        adobe.round_arch(-0.35, WIN_SPRING, WIN_R, ARCH_STEPS), HALF_X, inner_x, WALL)
     arched_window(right, "x", HALF_X, inner_x, -0.35)
     adobe.vigas(right, "x", HALF_X, (-HALF_Y, HALF_Y), CEILING - 0.30, 5, 1.0,
                 TRIM)
