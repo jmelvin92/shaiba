@@ -203,7 +203,7 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 - **`scenes/world/homestead.tscn`** — house plus furnishing instances, spawned by `LevelRoot` at the seeded homestead centre; player start moves to the courtyard.
 
 **Part 1 exit bar**
-- [x] `tools/verify_house.gd` passes: doorway passable at walk and run, walls block, stair climbs, cutaway fires on entry and exit with roof transparency asserted. *(All eight checks pass. It earned its keep immediately: the first stair had 0.34 m treads, which look perfectly normal and are unclimbable — the player's step-up probe reads the next riser as a wall — so the upper floor was unreachable and nothing visual showed it. Treads are now 0.48 m and the rule is in ART_DIRECTION.)*
+- [x] `tools/verify_house.gd` passes: doorway passable at walk and run, walls block, stair climbs, cutaway fires on entry and exit with roof transparency asserted, the interior floor clears the sand, and four approach lanes get through at both the door and the stair. *(It earned its keep three times over — every bug below was found by it rather than by looking.)*
 - [x] `verify_terrain` (all modes) and `verify_player` still pass — flattening did not break determinism, seams or the slope audit. *(World hash unchanged; homestead pad holds 0.084 m of relief with an 11.5° approach against the 31° limit; collision still 0.0000 m off the mesh and 0.047 m off the analytic field. The collision audit learned to ignore rays that land on the homestead — buildings share the world layer, and a ray hitting a roof is not evidence about `HeightMapShape3D`.)*
 - [ ] Screenshots at the gameplay camera reviewed by Joshua (approach, doorway, interior with cutaway). **← the one thing outstanding in Part 1.** Shots are committed at `docs/references/ingame_*.png`.
 - [x] Performance with the homestead on screen: 119 fps average, worst frame 8.55 ms over 600 windowed frames — no measurable cost from the building, its thirteen static bodies or the cutaway.
@@ -211,7 +211,15 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 
 **Handoff notes (2026-08-14)**
 
-Part 1 is complete and verified; only Joshua's look review is outstanding. What exists now:
+Part 1 is complete and verified, and Joshua has played it. Three things came out of that playtest and are all fixed and committed — worth reading before touching movement or building geometry, because two of them are general rules rather than one-off bugs:
+
+1. **The camera now orbits 360° on a left-click drag** (his request, raised as "sooner than later" and correctly so — judging any building depends on being able to walk round it). Yaw is free, **pitch stays fixed**: it is a turntable, not free-look, so the diorama framing can't be lost and the camera can't be driven into a dune. `orbit_sensitivity` and `invert_orbit` are exports if the feel needs tuning. `verify_player --orbit` guards the camera-relative movement contract.
+2. **"The floor is sand"** — and the material was never the cause. The slab sat flush with the terrain and the desert stood *above* it at 193 of 195 points across the footprint. Ripples now fade out on the homestead pad (relief 0.084 m → 0.000 m) and the floor is lifted 0.12 m. That lift then shut the front door, because a doorway must clear the player's height *plus* the step-up lift above any threshold; `DOOR_H` is 2.40 m.
+3. **"I get hung up on ledges and stairs"** — the step-up probe was being defeated by contact the body was only sliding along, so a doorway with 0.20 m of slack gave 0.12 m you could actually walk through. The probe now runs 7 cm slimmer (`step_probe_slim`) with its reach widened to match; usable doorway width went to 0.50 m. Geometry was widened too (`DOOR_W` 1.30 m, `STAIR_W` 1.50 m). **Every Phase 3 movement number is unchanged.**
+
+**Two constraints now bind every building we ever make**, both in ART_DIRECTION's modelling rules: stair treads must exceed ~0.41 m, and doorways need ~1.2 m of clear width plus the player's height *plus* 0.35 m of headroom above any threshold. Both produced geometry that looked perfect and could not be entered.
+
+What exists now:
 
 - **The house** (`tools/build_house.py` → `house.blend`/`house.glb`, 2,136 tris) — two storeys, vigas, wood-framed windows, cloth awning, external stair to an upper-floor door. Wall tone is one constant with a `--wall <palette>` override that renders a comparison ladder without touching the committed asset, if Joshua wants to see alternatives to `clay`. In-engine, clay reads well against the sand — better than the Blender previews suggested, so no ladder was forced.
 - **`InteriorCutaway`** — reusable for every future building; nothing per-storey to configure.
@@ -223,6 +231,8 @@ Loose ends worth knowing about, none blocking:
 - The interior is lit only by ambient and what comes through the door and windows. It reads fine at the gameplay camera; if it ever feels gloomy, the oil lamp is the obvious place to hang a small `OmniLight3D`.
 - **Per-prop `.tscn` wrappers do not exist yet** — furnishings are instanced from their `.glb` directly. When a prop first needs behaviour (an interactable lamp), that is the moment to add `scenes/props/<name>/<name>.tscn`.
 - No date palm, well or rocks yet; Joshua chose to pick small props as we go.
+- **The wall tone has not been laddered.** It is `clay`, and in engine it holds up against the sand better than the Blender previews suggested, so no ladder was forced. `build_house.py --wall <palette name>` renders a comparison set without touching the committed asset if Joshua ever wants to compare.
+- **A bounded ObjectDB warning at engine shutdown** (2–3 instances, only with the house present and the player spawning near it). Bisected away from every system involved; does not grow with run length; no gameplay effect. Recorded in DECISIONS rather than chased further.
 
 ### Part 2 — Camel & the missing player clips
 

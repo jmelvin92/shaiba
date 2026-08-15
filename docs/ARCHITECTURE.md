@@ -70,10 +70,11 @@ each mode answers one question that an eye cannot judge reliably:
 | `--stairs` | how far does the collider move in a tick, and how far does the *mesh*? |
 | `--graybox` | do the level fixtures still behave at the current speeds? |
 | `--sweep` | what body speed matches a clip's stride? |
+| `--orbit` | with the camera turned to any bearing, is "forward" still away from it? |
 
 Keep these working as movement changes — they are how a "feels wrong" report
-gets turned into a number, and twice now the number has pointed somewhere other
-than the obvious culprit.
+gets turned into a number, and three times now the number has pointed somewhere
+other than the obvious culprit.
 
 **`tools/verify_terrain.gd` is the Phase 4 gate as an executable.** Run
 headless (`--headless --path . --script res://tools/verify_terrain.gd [-- <mode>]`):
@@ -144,4 +145,14 @@ Both playable level scenes (`world.tscn`, `graybox.tscn`) use `LevelRoot` as the
 
 - **Collision layers:** 1 = world/terrain (and every static prop), 2 = player, 3 = *fadeable occluder*. Anything that should turn see-through when it hides the player sits on layers 1 **and** 3 (`collision_layer = 5`); terrain stays on layer 1 alone so it can never fade out from under the character. The player is on layer 2 by itself and masks layer 1.
 - **The camera never moves to avoid geometry.** `scenes/camera/occluder_fader.gd`, a child of the camera rig, fades whatever is in the way instead. Give every new prop `collision_layer = 5` unless it is terrain. One narrow exception since the 19° camera: the rig *lifts vertically* just enough to keep 1.2 m of clearance above the terrain's analytic height under the camera — framing distance never changes, so this is not the rejected ducking (DECISIONS.md).
-- **Physics interpolation is on project-wide.** Anything that moves does so in `_physics_process`, never `_process`, so gameplay nodes share one 60 Hz tick and interpolation smooths them to the render rate together. Code that teleports a node must call `reset_physics_interpolation()`.
+- **Physics interpolation is on project-wide.** Anything that moves does so in `_physics_process`, never `_process`, so gameplay nodes share one 60 Hz tick and interpolation smooths them to the render rate together. Code that teleports a node must call `reset_physics_interpolation()`. Input that arrives at the render rate — mouse motion, notably — is banked and applied on the tick, for the same reason.
+- **The camera orbits, the pitch does not.** A left-click drag (`camera_orbit`) turns the rig freely around the player; the vertical component of the drag is ignored. Movement stays camera-relative through `yaw_changed` → `player.set_view_yaw`, which is the part that can silently break — `verify_player --orbit` walks four bearings and asserts "forward" is still away from the camera at each.
+
+## Walking on things that were modelled
+
+Geometry the player walks on is constrained by the controller, not only by looks. Two numbers in `player.gd` govern more level design than their names suggest, and both have already produced architecture that looked perfect and could not be used (see ART_DIRECTION's modelling rules, and DECISIONS):
+
+- **`max_step_height`** (0.35 m) sets the tallest step, and — because the probe lifts the capsule by it before reaching forward — also the *headroom* a doorway needs above any threshold: the player's height plus this.
+- **`step_probe_margin` + the capsule radius** set the shallowest usable stair tread (~0.41 m). A shallower tread puts the next riser inside the probe's reach, and the whole flight reads as a wall.
+
+`step_probe_slim` (0.07 m) is why grazing a jamb or a side wall no longer defeats the probe. Before it, a doorway with 0.20 m of geometric slack had 0.12 m you could actually walk through; the fix is what makes the *modelled* clearance the real clearance. When adding a doorway or stair, sweep several approach lanes rather than walking the middle once — `verify_house._lanes_are_wide_enough` is the worked example.
