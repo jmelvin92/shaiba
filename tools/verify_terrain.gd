@@ -20,6 +20,10 @@ const SETTINGS_PATH: String = "res://resources/terrain/desert.tres"
 const SLOPE_LIMIT_DEG: float = 31.0
 ## Half-width of the audited square around the origin, metres.
 const AUDIT_EXTENT: float = 2000.0
+## How much height variation the homestead pad may have across it, metres. The
+## ripple that survives on thin sand is a few centimetres; this catches the pad
+## failing to flatten at all.
+const PAD_RELIEF_LIMIT: float = 0.10
 
 var _failures: PackedStringArray = []
 
@@ -47,6 +51,7 @@ func _run() -> void:
 		_determinism()
 		_seams()
 		_slope_audit()
+		_homestead_audit()
 		_depth_sanity()
 		return
 	if args.has("--collision"):
@@ -160,6 +165,71 @@ func _slope_audit() -> void:
 			"slope audit: %.2f deg at (%.0f, %.0f) exceeds the %.0f deg limit"
 			% [worst, worst_at.x, worst_at.y, SLOPE_LIMIT_DEG]
 		)
+
+
+## The homestead pad, audited densely rather than by luck.
+##
+## The pad is a couple of hundred square metres inside a 16 km² audit area, so
+## the random slope audit above may put only a handful of samples on the one
+## piece of terrain this project *edits* rather than generates. Its blend band
+## is also the only place where a slope is manufactured instead of inherited
+## from noise, which makes it the one place a slope failure could be introduced
+## by a tuning change. So: sample it deliberately, and check the pad is really
+## flat enough to stand a building on.
+func _homestead_audit() -> void:
+	var settings: TerrainSettings = _fresh_settings(_world_seed())
+	var centre: Vector2 = settings.get_homestead_center()
+	var outer: float = settings.homestead_radius + settings.homestead_blend
+	var epsilon: float = 0.5
+
+	var worst_slope: float = 0.0
+	var worst_at: Vector2 = Vector2.ZERO
+	var pad_low: float = INF
+	var pad_high: float = -INF
+
+	# A polar sweep, finest across the blend band where the slope actually is.
+	for ring: int in range(241):
+		var radius: float = outer * 1.15 * float(ring) / 240.0
+		for spoke: int in range(180):
+			var angle: float = TAU * float(spoke) / 180.0
+			var at: Vector2 = centre + Vector2(cos(angle), sin(angle)) * radius
+			var height: float = settings.get_surface_height(at)
+			if radius <= settings.homestead_radius:
+				pad_low = minf(pad_low, height)
+				pad_high = maxf(pad_high, height)
+			var dx: float = (
+				settings.get_surface_height(at + Vector2(epsilon, 0.0))
+				- settings.get_surface_height(at - Vector2(epsilon, 0.0))
+			) / (2.0 * epsilon)
+			var dz: float = (
+				settings.get_surface_height(at + Vector2(0.0, epsilon))
+				- settings.get_surface_height(at - Vector2(0.0, epsilon))
+			) / (2.0 * epsilon)
+			var slope: float = rad_to_deg(atan(sqrt(dx * dx + dz * dz)))
+			if slope > worst_slope:
+				worst_slope = slope
+				worst_at = at
+
+	var relief: float = pad_high - pad_low
+	print(
+		"homestead: centre (%.1f, %.1f), pad relief %.3f m, approach worst %.2f deg"
+		% [centre.x, centre.y, relief, worst_slope]
+	)
+	if worst_slope >= SLOPE_LIMIT_DEG:
+		_fail(
+			"homestead approach: %.2f deg at (%.0f, %.0f) exceeds the %.0f deg limit"
+			% [worst_slope, worst_at.x, worst_at.y, SLOPE_LIMIT_DEG]
+		)
+	# A building sits on this. A few centimetres of ripple is fine; anything
+	# approaching a step is not, because the walls are flat-bottomed.
+	if relief > PAD_RELIEF_LIMIT:
+		_fail(
+			"homestead pad is not flat: %.3f m of relief across it (limit %.2f)"
+			% [relief, PAD_RELIEF_LIMIT]
+		)
+	var depth: float = settings.get_sand_depth(centre)
+	if depth > 0.6:
+		_fail("homestead pad sand is %.2f m deep; the courtyard should be firm" % depth)
 
 
 ## Instances the real world scene and rains rays on the loaded chunks.

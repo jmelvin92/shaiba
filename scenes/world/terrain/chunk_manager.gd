@@ -88,10 +88,21 @@ func get_pending_count() -> int:
 
 ## Blocks until every in-flight build has finished. The workers hold a bound
 ## reference to this node, so it must not be freed while any task still runs.
+##
+## Those last workers each push a finished [TerrainChunk.BuildData] onto the
+## results queue on their way out, and nothing will ever install them — so the
+## queue is dropped here too. BuildData is a RefCounted, and leaving a handful
+## of them in a member array at teardown is exactly the "ObjectDB instances
+## were leaked" warning at exit. It only showed up once the player's spawn
+## moved out to the homestead, far enough that chunks are still streaming when
+## a short headless run quits.
 func _exit_tree() -> void:
 	for coord: Vector2i in _pending.keys():
 		WorkerThreadPool.wait_for_task_completion(_pending[coord] as int)
 	_pending.clear()
+	_results_mutex.lock()
+	_results.clear()
+	_results_mutex.unlock()
 
 
 func _process(_delta: float) -> void:

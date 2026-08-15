@@ -67,6 +67,22 @@ extends Resource
 ## along it. 1.0 disables the stretch.
 @export_range(0.1, 1.0, 0.05) var wind_stretch: float = 0.4
 
+@export_group("Homestead")
+## Radius, metres, of the flat pad the homestead stands on. Nothing inside it
+## keeps any dune shape: a building needs ground that is actually level.
+@export_range(4.0, 40.0, 0.5) var homestead_radius: float = 13.0
+## Width, metres, of the band where the pad blends back into the desert. The
+## slope this band produces is roughly 1.5 * height_difference / width, so a
+## wider band is what keeps the join inside the terrain's 31 deg slope budget.
+@export_range(4.0, 40.0, 0.5) var homestead_blend: float = 15.0
+## Sand thickness on the pad, metres. Thin on purpose — packed courtyard earth,
+## which also means footprints fade out as you approach the door, and the
+## colour ramp paints it the darker sand_shadow end.
+@export_range(0.0, 1.0, 0.05) var homestead_sand_depth: float = 0.25
+## Annulus, metres from the origin, searched for a site.
+@export_range(20.0, 300.0, 5.0) var homestead_search_min: float = 45.0
+@export_range(20.0, 400.0, 5.0) var homestead_search_max: float = 110.0
+
 @export_group("Color")
 ## Sand depth, metres, at which the surface tone reaches the palette's
 ## sand_light (dune crests). Shallower sand grades down through sand_mid
@@ -80,9 +96,24 @@ extends Resource
 var _wind_cos: float = 1.0
 var _wind_sin: float = 0.0
 
+## Where the homestead stands, and the substrate height it was levelled to.
+## Chosen once by [method setup] and never written again, so builder threads
+## may read them freely.
+var _homestead_center: Vector2 = Vector2.ZERO
+var _homestead_base: float = 0.0
 
-## Seeds every noise field from [param world_seed] and caches the wind frame.
-## Must be called once before any sampling; never after builder threads start.
+## Candidate sites are taken from this many rings and spokes in the search
+## annulus, and each is judged against this many directions. Fixed rather than
+## exported: they trade setup time (a few milliseconds) against site quality,
+## which is not a thing worth tuning per-world.
+const SITE_RINGS: int = 6
+const SITE_SPOKES: int = 24
+const SITE_PROBES: int = 12
+
+
+## Seeds every noise field from [param world_seed], caches the wind frame and
+## picks the homestead site. Must be called once before any sampling; never
+## after builder threads start.
 func setup(world_seed: int) -> void:
 	base_noise.seed = world_seed
 	dune_noise.seed = world_seed + 1
@@ -91,17 +122,47 @@ func setup(world_seed: int) -> void:
 	var wind_yaw: float = deg_to_rad(wind_yaw_degrees)
 	_wind_cos = cos(wind_yaw)
 	_wind_sin = sin(wind_yaw)
+	_choose_homestead(world_seed)
+
+
+## Centre of the homestead pad, world XZ. Deterministic from the world seed.
+func get_homestead_center() -> Vector2:
+	return _homestead_center
+
+
+## Height of the levelled pad the homestead is built on, metres.
+func get_homestead_surface() -> float:
+	return get_surface_height(_homestead_center)
 
 
 ## Height of the hard ground under the sand, metres.
 func get_base_height(world_xz: Vector2) -> float:
-	return base_amplitude * base_noise.get_noise_2d(world_xz.x, world_xz.y)
+	var raw: float = _raw_base_height(world_xz)
+	var flatten: float = _homestead_weight(world_xz)
+	if flatten <= 0.0:
+		return raw
+	return lerpf(raw, _homestead_base, flatten)
 
 
 ## Thickness of the sand layer, metres. 0.0 is a valid answer: exposed hard
 ## ground. This is the number Phase 5's footprints and the player's deep-sand
 ## movement hooks key off.
 func get_sand_depth(world_xz: Vector2) -> float:
+	var raw: float = _raw_sand_depth(world_xz)
+	var flatten: float = _homestead_weight(world_xz)
+	if flatten <= 0.0:
+		return raw
+	return lerpf(raw, homestead_sand_depth, flatten)
+
+
+## The desert as it would be with no homestead in it. The site search has to
+## sample this rather than the public functions, which would otherwise be
+## reading a pad that has not been chosen yet.
+func _raw_base_height(world_xz: Vector2) -> float:
+	return base_amplitude * base_noise.get_noise_2d(world_xz.x, world_xz.y)
+
+
+func _raw_sand_depth(world_xz: Vector2) -> float:
 	# Rotate into the wind frame and compress the along-wind axis, which
 	# stretches the dune pattern across the wind.
 	var along: float = (world_xz.x * _wind_cos + world_xz.y * _wind_sin) * wind_stretch
@@ -110,6 +171,66 @@ func get_sand_depth(world_xz: Vector2) -> float:
 	var dunes: float = dune_amplitude * pow(dune_raw, dune_sharpness)
 	var drift: float = drift_amplitude * drift_noise.get_noise_2d(world_xz.x, world_xz.y)
 	return maxf(dunes + drift + depth_floor, 0.0)
+
+
+## How completely the homestead pad overrides the desert at a point: 1 on the
+## pad, easing to 0 across the blend band.
+func _homestead_weight(world_xz: Vector2) -> float:
+	var distance: float = world_xz.distance_to(_homestead_center)
+	if distance <= homestead_radius:
+		return 1.0
+	var outer: float = homestead_radius + homestead_blend
+	if distance >= outer:
+		return 0.0
+	return 1.0 - smoothstep(homestead_radius, outer, distance)
+
+
+## Picks the flattest site in the search annulus.
+##
+## Levelling a pad into a dune body would leave a wall of sand around it far
+## steeper than the player can walk, so the site is chosen to need the least
+## levelling in the first place: the score is the largest height difference the
+## blend band would have to absorb, and the search simply takes the smallest.
+func _choose_homestead(world_seed: int) -> void:
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = world_seed
+	# A seeded angular offset so two worlds don't put the homestead on the same
+	# bearing, while the lattice itself stays fixed and reproducible.
+	var offset: float = rng.randf() * TAU
+
+	var best: Vector2 = Vector2(homestead_search_min, 0.0)
+	var best_score: float = INF
+	for ring: int in range(SITE_RINGS):
+		var t: float = float(ring) / float(maxi(SITE_RINGS - 1, 1))
+		var radius: float = lerpf(homestead_search_min, homestead_search_max, t)
+		for spoke: int in range(SITE_SPOKES):
+			var angle: float = offset + TAU * float(spoke) / float(SITE_SPOKES)
+			var candidate: Vector2 = Vector2(cos(angle), sin(angle)) * radius
+			var score: float = _site_score(candidate)
+			if score < best_score:
+				best_score = score
+				best = candidate
+
+	_homestead_center = best
+	_homestead_base = _raw_base_height(best)
+
+
+## The worst height step the blend band around [param centre] would have to
+## swallow, plus a nudge away from deep sand so the pad prefers a flat between
+## dunes over a hollow carved out of one.
+func _site_score(centre: Vector2) -> float:
+	var pad: float = _raw_base_height(centre) + homestead_sand_depth
+	var worst: float = 0.0
+	for probe: int in range(SITE_PROBES):
+		var angle: float = TAU * float(probe) / float(SITE_PROBES)
+		var direction: Vector2 = Vector2(cos(angle), sin(angle))
+		for band: float in [0.0, 0.5, 1.0]:
+			var at: Vector2 = centre + direction * (
+				homestead_radius + homestead_blend * band
+			)
+			var surface: float = _raw_base_height(at) + _raw_sand_depth(at)
+			worst = maxf(worst, absf(surface - pad))
+	return worst + _raw_sand_depth(centre) * 0.5
 
 
 ## Height of the walkable sand surface, metres — what the terrain mesh and

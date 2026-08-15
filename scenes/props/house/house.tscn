@@ -1,0 +1,78 @@
+[gd_scene load_steps=15 format=3]
+
+[ext_resource type="Script" path="res://scenes/props/house/house.gd" id="1_house"]
+[ext_resource type="PackedScene" uid="uid://cov78ohdr8lmr" path="res://assets/models/house.glb" id="2_model"]
+[ext_resource type="Script" path="res://scenes/props/interior_cutaway.gd" id="3_cutaway"]
+[ext_resource type="PackedScene" uid="uid://bkba4pi3j4cjc" path="res://assets/models/rug.glb" id="4_rug"]
+[ext_resource type="PackedScene" uid="uid://ddmfmic56f5a3" path="res://assets/models/low_sofa.glb" id="5_sofa"]
+[ext_resource type="PackedScene" uid="uid://cnw6yxpb0151e" path="res://assets/models/low_table.glb" id="6_table"]
+[ext_resource type="PackedScene" uid="uid://b68u0sy3kwaab" path="res://assets/models/pouf.glb" id="7_pouf"]
+[ext_resource type="PackedScene" uid="uid://6ll1x2cxet87" path="res://assets/models/floor_cushion.glb" id="8_cushion"]
+[ext_resource type="PackedScene" uid="uid://v4xp4n6ipnjb" path="res://assets/models/pottery.glb" id="9_pottery"]
+[ext_resource type="PackedScene" uid="uid://ckd152v1oi2vq" path="res://assets/models/hookah.glb" id="10_hookah"]
+[ext_resource type="PackedScene" uid="uid://hlrkgf321vfb" path="res://assets/models/oil_lamp.glb" id="11_lamp"]
+[ext_resource type="PackedScene" uid="uid://d18u6421iseo0" path="res://assets/models/bed.glb" id="12_bed"]
+[ext_resource type="PackedScene" uid="uid://bx5mhhgnetfig" path="res://assets/models/tapestry.glb" id="13_tapestry"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_interior"]
+size = Vector3(7, 5.7, 6)
+
+[node name="House" type="Node3D"]
+script = ExtResource("1_house")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+
+[node name="Cutaway" type="Node3D" parent="."]
+script = ExtResource("3_cutaway")
+
+[node name="Interior" type="Area3D" parent="Cutaway"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.88, 0)
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Cutaway/Interior"]
+shape = SubResource("BoxShape3D_interior")
+
+[node name="Furnishings" type="Node3D" parent="."]
+
+[node name="Rug" parent="Furnishings" instance=ExtResource("4_rug")]
+transform = Transform3D(0.996195, 0, -0.0871558, 0, 1, 0, 0.0871558, 0, 0.996195, 0.8, 0.005, 0.9)
+
+[node name="SofaBack" parent="Furnishings" instance=ExtResource("5_sofa")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0.3, 0, 2.55)
+
+[node name="SofaRight" parent="Furnishings" instance=ExtResource("5_sofa")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 3.1, 0, 0.5)
+
+[node name="LowTable" parent="Furnishings" instance=ExtResource("6_table")]
+transform = Transform3D(0.996195, 0, -0.0871558, 0, 1, 0, 0.0871558, 0, 0.996195, 0.8, 0.02, 0.9)
+
+[node name="Pouf" parent="Furnishings" instance=ExtResource("7_pouf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.05, 0, -0.75)
+
+[node name="FloorCushionA" parent="Furnishings" instance=ExtResource("8_cushion")]
+transform = Transform3D(0.939693, 0, 0.34202, 0, 1, 0, -0.34202, 0, 0.939693, -0.75, 0, 1.55)
+
+[node name="FloorCushionB" parent="Furnishings" instance=ExtResource("8_cushion")]
+transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, -1.55, 0, -0.35)
+
+[node name="Pottery" parent="Furnishings" instance=ExtResource("9_pottery")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.05, 0, 2.6)
+
+[node name="Hookah" parent="Furnishings" instance=ExtResource("10_hookah")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.85, 0, 1.5)
+
+[node name="OilLamp" parent="Furnishings" instance=ExtResource("11_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.1, 0, -1.1)
+
+[node name="TapestryGround" parent="Furnishings" instance=ExtResource("13_tapestry")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.9, 1.25, 3.09)
+
+[node name="Bed" parent="Furnishings" instance=ExtResource("12_bed")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -1.9, 3.05, 1.4)
+
+[node name="TapestryUpper" parent="Furnishings" instance=ExtResource("13_tapestry")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.4, 4.25, 2.94)
+
+[node name="PotteryUpper" parent="Furnishings" instance=ExtResource("9_pottery")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 3.05, -2.3)

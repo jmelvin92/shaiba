@@ -97,7 +97,10 @@ func _apply_fades(blocking: Dictionary, delta: float) -> void:
 
 ## The meshes to fade for a body the ray hit. A CSG shape is its own geometry;
 ## an imported prop keeps its collider and its mesh in the same little subtree,
-## either way round, so check the body, then below it, then alongside it.
+## either way round, so check the body, then below it, then alongside it — and
+## then the parent itself, which is where Godot's glTF importer puts the mesh
+## when a model uses the `-col` name suffix (the StaticBody3D hangs *under* the
+## MeshInstance3D, so the mesh is the parent, not one of the parent's children).
 func _visuals_of(collider: Object) -> Array[GeometryInstance3D]:
 	var body: Node = collider as Node
 	if body == null:
@@ -107,8 +110,15 @@ func _visuals_of(collider: Object) -> Array[GeometryInstance3D]:
 
 	var found: Array[GeometryInstance3D] = []
 	_collect_visuals(body, found)
-	if found.is_empty() and body.get_parent() != null:
-		_collect_visuals(body.get_parent(), found)
+	if not found.is_empty():
+		return found
+
+	var parent: Node = body.get_parent()
+	if parent == null:
+		return found
+	if parent is GeometryInstance3D:
+		return [parent as GeometryInstance3D]
+	_collect_visuals(parent, found)
 	return found
 
 

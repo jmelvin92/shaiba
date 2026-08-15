@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scenes/world/level_root.gd" id="1_level"]
 [ext_resource type="PackedScene" path="res://scenes/world/desert_environment.tscn" id="2_env"]
@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="6_player"]
 [ext_resource type="PackedScene" path="res://scenes/camera/camera_rig.tscn" id="7_camera"]
 [ext_resource type="PackedScene" path="res://scenes/world/terrain/sand_deformation.tscn" id="8_sand"]
+[ext_resource type="PackedScene" path="res://scenes/world/homestead.tscn" id="9_homestead"]
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_level")
@@ -23,6 +24,8 @@ unload_radius = 6
 [node name="DebugOverlay" parent="ChunkManager" instance=ExtResource("5_overlay")]
 
 [node name="SandDeformation" parent="." instance=ExtResource("8_sand")]
+
+[node name="Homestead" parent="." instance=ExtResource("9_homestead")]
 
 [node name="Player" parent="." instance=ExtResource("6_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
