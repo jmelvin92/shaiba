@@ -18,7 +18,8 @@ CLAUDE.md, PLAN.md, docs/    # process & design docs (Godot ignores them)
 autoload/
   game.gd                    # `Game` singleton: world seed, top-level state. Keep small.
 scenes/
-  player/                    # player.tscn, player.gd (+ later: footstep_stamper.gd …)
+  player/                    # player.tscn, player.gd, footstep_stamper.gd,
+                             #   interactor.gd (the player half of interaction)
   camera/                    # camera_rig.tscn, camera_rig.gd, occluder_fader.gd
   world/
     world.tscn               # main scene: environment, terrain, spawns player+camera
@@ -30,6 +31,9 @@ scenes/
   props/
     house/                   # house.tscn + house.gd, from assets/models/house.glb
     interior_cutaway.gd      # `InteriorCutaway`: shared by every enterable building
+    interactable.gd          # `Interactable`: the prop half of interaction
+    door/                    # door.tscn + door.gd, from assets/models/door.glb —
+                             #   one reusable swinging door for every building
     camel/                   # camel.tscn, camel.gd (Phase 6 Part 2)
     …                        # one folder per prop
   ui/                        # later: HUD, menus (empty until needed)
@@ -49,6 +53,7 @@ tools/                       # build and measurement scripts — not shipped, no
   build_player.py            # Blender: Meshy source .glb -> player.blend + player.glb
   build_house.py             # Blender: the desert house -> house.blend + house.glb
   build_furnishings.py       # Blender: ten reusable interior props, one glb each
+  build_door.py              # Blender: the shared door leaf -> door.blend + door.glb
   map_palette_materials.py   # points a .glb.import's materials at palette .tres
   verify_house.gd            # Phase 6 Part 1 gate (see below)
   shoot_house.gd             # homestead screenshots at the gameplay camera
@@ -133,7 +138,15 @@ A building is an imported model plus two small scripts; there is no building fra
 - **Furnishings are independent assets** — one `.blend`/`.glb` each, instanced under a `Furnishings` node. `tools/map_palette_materials.py` points each model's materials at the palette `.tres` files through its `.import`, so palette edits reach every asset without a re-export.
 - **POI ground:** `TerrainSettings` levels a pad at a seeded site (`get_homestead_center`), and because everything samples the same analytic functions, mesh, collision, spawn seating, print depth and camera lift all inherit it. `LevelRoot` moves `homestead.tscn` onto the pad and takes the player's start from its `PlayerSpawn` marker.
 
-`tools/verify_house.gd` is Part 1's gate as an executable (headless): doorway passable at walk and run, walls block, the stair climbs to the upper floor, the cutaway opens *and closes*, and the layer partition holds. `tools/shoot_house.gd` (windowed) captures the review screenshots at the real gameplay camera.
+`tools/verify_house.gd` is Part 1's gate as an executable (headless): the closed front door blocks and E opens/closes it from both sides, the doorway is passable at walk and run, walls block, the stair climbs to the upper floor and its door admits you, the cutaway opens *and closes*, and the layer partition holds. `tools/shoot_house.gd` (windowed) captures the review screenshots at the real gameplay camera.
+
+## Interaction (as built in the Phase 6 continuation)
+
+Pressing **E** near something usable uses it. Two components, wired only by physics overlap and one signal, so any prop can join without touching player code:
+
+- **`Interactable`** (`scenes/props/interactable.gd`, an `Area3D`) is the prop half: a `prompt` string, a `prompt_anchor`, an `enabled` switch and an `interacted(actor)` signal. It forces itself onto layer 4, where nothing physical can see it. The owning prop shapes its volume to cover everywhere the prop should be reachable from and connects the signal — the Phase 5 stamper shape: one signal, one connect.
+- **`Interactor`** (`scenes/player/interactor.gd`, an `Area3D` child of the player) is the player half: masks layer 4 only, offers the nearest enabled Interactable with a single floating `Label3D` ("E — Open", palette plaster on night-blue), and calls `interact(owner)` on it when E is pressed. `player.gd` does not know it exists.
+- **`Door`** (`scenes/props/door/`) is the first customer and the template for prop-side use: wraps `door.glb` (origin on the hinge) with an `AnimatableBody3D` box collider that turns with the leaf, connects its own Interactable, rewrites the prompt Open/Close, swings *away* from whoever opens it, and idles at zero cost once settled. A building instances it per doorway; the one thing the building says is whether the door is fader-managed (layer 5, like the ground walls) or cutaway-managed (`fadeable` off — the house hands the upper door's leaf to the cutaway so it vanishes with its storey).
 
 ## Main scene flow
 
@@ -143,7 +156,8 @@ Both playable level scenes (`world.tscn`, `graybox.tscn`) use `LevelRoot` as the
 
 ## Physics conventions
 
-- **Collision layers:** 1 = world/terrain (and every static prop), 2 = player, 3 = *fadeable occluder*. Anything that should turn see-through when it hides the player sits on layers 1 **and** 3 (`collision_layer = 5`); terrain stays on layer 1 alone so it can never fade out from under the character. The player is on layer 2 by itself and masks layer 1.
+- **Collision layers:** 1 = world/terrain (and every static prop), 2 = player, 3 = *fadeable occluder*, 4 = *interaction volumes*. Anything that should turn see-through when it hides the player sits on layers 1 **and** 3 (`collision_layer = 5`); terrain stays on layer 1 alone so it can never fade out from under the character. The player is on layer 2 by itself and masks layer 1. Layer 4 is `Interactable` areas only — nothing physical collides with it, and only the player's `Interactor` queries it.
+- **Moving colliders under a relocated ancestor:** `AnimatableBody3D` defaults to `sync_to_physics = true`, which only tracks *local* transform changes — a body under anything `LevelRoot` moves (the homestead, notably) is silently left behind in physics space. Set `sync_to_physics = false` (as `door.tscn` does); the body then follows ancestor moves like any imported `StaticBody3D`, and a swinging part still pushes the player by depenetration. (Cost a debugging round — see DECISIONS.)
 - **The camera never moves to avoid geometry.** `scenes/camera/occluder_fader.gd`, a child of the camera rig, fades whatever is in the way instead. Give every new prop `collision_layer = 5` unless it is terrain. One narrow exception since the 19° camera: the rig *lifts vertically* just enough to keep 1.2 m of clearance above the terrain's analytic height under the camera — framing distance never changes, so this is not the rejected ducking (DECISIONS.md).
 - **Physics interpolation is on project-wide.** Anything that moves does so in `_physics_process`, never `_process`, so gameplay nodes share one 60 Hz tick and interpolation smooths them to the render rate together. Code that teleports a node must call `reset_physics_interpolation()`. Input that arrives at the render rate — mouse motion, notably — is banked and applied on the tick, for the same reason.
 - **The camera orbits, the pitch does not.** A left-click drag (`camera_orbit`) turns the rig freely around the player; the vertical component of the drag is ignored. Movement stays camera-relative through `yaw_changed` → `player.set_view_yaw`, which is the part that can silently break — `verify_player --orbit` walks four bearings and asserts "forward" is still away from the camera at each.

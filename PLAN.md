@@ -16,7 +16,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 3 | Character model & animation | `feature/phase-3-character` | ✅ Done (2026-08-13) |
 | 4 | Terrain & chunk streaming | `feature/phase-4-terrain` | ✅ Done (2026-08-13) |
 | 5 | Sand footprint physics | `feature/phase-5-footprints` | ✅ Done (2026-08-14) |
-| 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🟡 In progress — Part 1 done (awaiting look review), Part 2 needs Meshy assets |
+| 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🟡 In progress — Part 1 + door/interaction system done (awaiting look review), Part 2 needs Meshy assets |
 | 7 | Integration & polish → v0.1 | `feature/phase-7-polish` | 🔲 Not started |
 
 Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `development` · ✅ Done (merged, gate passed)
@@ -201,11 +201,13 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 - **`scenes/props/house/`** — `house.tscn`/`house.gd` with hand-authored collision (walls `collision_layer = 5` fadeable; slabs and roof on layer 1 only, so the occluder fader never fights the cutaway for the same `transparency` property).
 - **`scenes/props/interior_cutaway.gd`** (`InteriorCutaway`) — story-aware: an `Area3D` per story, exported lists of the visuals above it, smooth fade out on entry and back on exit.
 - **`scenes/world/homestead.tscn`** — house plus furnishing instances, spawned by `LevelRoot` at the seeded homestead centre; player start moves to the courtyard.
+- **Doors & interaction** *(added at Joshua's direction, 2026-08-14)*: a built-in interaction mechanic (`Interactable` on the prop + `Interactor` on the player, E to use, floating prompt) and a reusable `Door` prop (`tools/build_door.py` → `scenes/props/door/`) that swings away from whoever opens it. Both house doorways get one; every future building reuses both systems as-is.
 
 **Part 1 exit bar**
 - [x] `tools/verify_house.gd` passes: doorway passable at walk and run, walls block, stair climbs, cutaway fires on entry and exit with roof transparency asserted, the interior floor clears the sand, and four approach lanes get through at both the door and the stair. *(It earned its keep three times over — every bug below was found by it rather than by looking.)*
 - [x] `verify_terrain` (all modes) and `verify_player` still pass — flattening did not break determinism, seams or the slope audit. *(World hash unchanged; homestead pad holds 0.084 m of relief with an 11.5° approach against the 31° limit; collision still 0.0000 m off the mesh and 0.047 m off the analytic field. The collision audit learned to ignore rays that land on the homestead — buildings share the world layer, and a ray hitting a roof is not evidence about `HeightMapShape3D`.)*
-- [ ] Screenshots at the gameplay camera reviewed by Joshua (approach, doorway, interior with cutaway). **← the one thing outstanding in Part 1.** Shots are committed at `docs/references/ingame_*.png`.
+- [ ] Screenshots at the gameplay camera reviewed by Joshua (approach, doorway, interior with cutaway — now including the closed door with its E prompt and the swung-open leaf). **← the one thing outstanding in Part 1.** Shots are committed at `docs/references/ingame_*.png`.
+- [x] Doors work as a mechanic, verified by `verify_house`: the closed front door blocks at walk speed, E opens it (swinging away from the opener), the doorway then passes every lane at both gaits, E from inside closes it and the closed leaf holds the player in, and the upper door admits the player to the upper storey from the stair head. Prompt text flips Open/Close with state; layer audit covers both doors and their interaction volumes.
 - [x] Performance with the homestead on screen: 119 fps average, worst frame 8.55 ms over 600 windowed frames — no measurable cost from the building, its thirteen static bodies or the cutaway.
 - [x] Zero errors/warnings: headless `--import`, per-script `--check-only`, standalone scene runs. *(One exception, recorded in DECISIONS: a bounded 2–3 instance ObjectDB warning at engine shutdown that appears only with the house present and the player spawning near it. Bisected away from every system involved; does not grow with run length; no gameplay effect.)*
 
@@ -218,6 +220,8 @@ Part 1 is complete and verified, and Joshua has played it. Three things came out
 3. **"I get hung up on ledges and stairs"** — the step-up probe was being defeated by contact the body was only sliding along, so a doorway with 0.20 m of slack gave 0.12 m you could actually walk through. The probe now runs 7 cm slimmer (`step_probe_slim`) with its reach widened to match; usable doorway width went to 0.50 m. Geometry was widened too (`DOOR_W` 1.30 m, `STAIR_W` 1.50 m). **Every Phase 3 movement number is unchanged.**
 
 **Two constraints now bind every building we ever make**, both in ART_DIRECTION's modelling rules: stair treads must exceed ~0.41 m, and doorways need ~1.2 m of clear width plus the player's height *plus* 0.35 m of headroom above any threshold. Both produced geometry that looked perfect and could not be entered.
+
+**Continuation session (2026-08-14, same day): doors and the interaction mechanic.** Joshua asked for openable doors on every structure, built as a real system rather than house code. What shipped: the `Interactable`/`Interactor` pair on new physics layer 4 (E to use, floating palette-colored prompt, one signal to connect a prop), the reusable `Door` prop (own `.blend`/`.glb`, hinge-origin leaf, hand-authored box collision on an `AnimatableBody3D`, swings away from the opener, prompt flips Open/Close), and doors in both house doorways. One engine trap cost a debugging round and is recorded in DECISIONS and ARCHITECTURE: `AnimatableBody3D`'s default `sync_to_physics = true` ignores ancestor moves, so the door's collision was left 90 m behind when the level placed the homestead — doors were visible but intangible. `verify_house` gained the full door gauntlet and everything passes; `verify_player` (all modes) and `verify_terrain` still pass. The review screenshots now include `ingame_door_closed.png` / `ingame_door_open.png`.
 
 What exists now:
 
