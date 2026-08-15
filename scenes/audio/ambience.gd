@@ -16,11 +16,12 @@ extends Node3D
 const GameClock := preload("res://autoload/game.gd")
 
 @export_group("Beds")
-## Full-day loudness of the daytime wind bed. Nearly muted (Joshua,
-## 2026-08-15, second pass — "mute or turn down significantly"): the current
-## bed is a stopgap until a real weather system brings its own sounds. Raise
-## this one export when that day comes.
-@export_range(-40.0, 6.0, 0.5) var day_volume_db: float = -28.0
+## Kills both wind beds outright (Joshua, 2026-08-15 — "mute the wind
+## completely"). The loop files and the crossfade logic stay ready; the
+## future weather system flips this one export back off.
+@export var beds_muted: bool = true
+## Full-day loudness of the daytime wind bed, when not muted.
+@export_range(-40.0, 6.0, 0.5) var day_volume_db: float = -16.0
 ## Full-night loudness of the night bed.
 @export_range(-40.0, 6.0, 0.5) var night_volume_db: float = -14.0
 
@@ -67,8 +68,8 @@ func _process(delta: float) -> void:
 	if _game != null:
 		hour = _game.time_of_day
 	var day: float = day_weight(hour)
-	_apply_bed(_day, day, day_volume_db)
-	_apply_bed(_night, 1.0 - day, night_volume_db)
+	_apply_bed(_day, 0.0 if beds_muted else day, day_volume_db)
+	_apply_bed(_night, 0.0 if beds_muted else 1.0 - day, night_volume_db)
 
 	_next_gust_in -= delta
 	if _next_gust_in <= 0.0:
