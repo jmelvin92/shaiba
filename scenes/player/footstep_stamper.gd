@@ -21,8 +21,9 @@ signal stamped(
 ## A foot hit the ground (Phase 6.6). Emitted at the same plant edge as the
 ## footprint stamp, so footstep *sound* and footprint can never drift apart —
 ## but as its own signal, because drag stamps and landing splats are sand
-## marks, not footfalls.
-signal foot_planted(world_xz: Vector2)
+## marks, not footfalls. `foot` is 0 = left, 1 = right (the bone order in
+## [method setup]), so each foot can carry its own sample.
+signal foot_planted(foot: int, world_xz: Vector2)
 
 @export_group("Footprints")
 ## Across-the-foot half-width of a print, metres.
@@ -103,7 +104,7 @@ func tick(delta: float, velocity: Vector3, footed: bool, wade: float) -> void:
 			if at.distance_to(_last_plant[foot]) >= min_step_distance:
 				_last_plant[foot] = at
 				stamped.emit(at, foot_radius, foot_strength, travel_angle, foot_stretch)
-				foot_planted.emit(at)
+				foot_planted.emit(foot, at)
 
 	if wade >= drag_wade_min:
 		_drag_travelled += body_speed * delta

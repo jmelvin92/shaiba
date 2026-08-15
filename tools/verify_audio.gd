@@ -167,19 +167,25 @@ func _check_footstep_logic() -> void:
 	print("footsteps:")
 	var here: Vector2 = Vector2(_player.global_position.x, _player.global_position.z)
 	_footsteps.tick(0.016, 2.0, false, true)
-	_footsteps.on_foot_planted(here)
+	_footsteps.on_foot_planted(0, here)
 	var walk_db: float = _footsteps.last_step_volume_db
 	_footsteps.tick(0.016, 4.5, false, true)
-	_footsteps.on_foot_planted(here)
+	_footsteps.on_foot_planted(1, here)
 	var run_db: float = _footsteps.last_step_volume_db
 	_check(
 		"run steps louder than walk steps (%.1f > %.1f dB)" % [run_db, walk_db],
 		run_db > walk_db
 	)
+	var left: AudioStream = SoundBank.stream("footsteps/sand_left.wav")
+	var right: AudioStream = SoundBank.stream("footsteps/sand_right.wav")
+	_check(
+		"sand per-foot samples are distinct files when sourced",
+		(left == null and right == null) or (left != null and right != null and left != right)
+	)
 	_footsteps.tick(0.016, 1.0, true, true)
 	_check("sneak shuffle arms while crouch-moving", _footsteps.is_shuffling())
 	var shuffled_steps: int = _footsteps.steps_played
-	_footsteps.on_foot_planted(here)
+	_footsteps.on_foot_planted(0, here)
 	_check(
 		"crouched plants make no step sound", _footsteps.steps_played == shuffled_steps
 	)

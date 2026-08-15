@@ -24,10 +24,11 @@ Run sets (`*_run`) are **optional**: a surface without one automatically
 reuses its walk takes at run loudness. Sourcing a real run set for a surface
 overrides the fallback the moment its files land.
 
-A surface can instead use a **continuous movement track**: drop a single
-`<surface>_loop.wav` (or `.ogg`) — e.g. `sand_loop.wav` — and it plays while
-moving on that surface (louder and slightly faster at a run), replacing
-per-step one-shots entirely. Sand works this way as of 2026-08-15.
+Preferred (Joshua's design, 2026-08-15): give a surface **one sample per
+foot** — `<surface>_left.wav` + `<surface>_right.wav` — and each plays
+exactly when that foot's print stamps; running keeps the identical samples,
+slightly louder. Per-foot samples beat the numbered take sets when both
+exist. Sand works this way.
 
 | Files | What it should sound like |
 |---|---|

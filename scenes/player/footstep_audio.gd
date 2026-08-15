@@ -31,11 +31,9 @@ signal noise_made(world_position: Vector3, loudness: float)
 @export_range(0.5, 8.0, 0.1) var run_speed_threshold: float = 3.0
 ## Loudness of a walking step.
 @export_range(-40.0, 6.0, 0.5) var walk_volume_db: float = -7.0
-## Loudness of a running step.
-@export_range(-40.0, 6.0, 0.5) var run_volume_db: float = -1.0
-## Pitch of a surface's movement loop while running — a touch faster, so the
-## step cadence in the track picks up with the player. 1.0 = unchanged.
-@export_range(1.0, 1.5, 0.01) var run_loop_pitch: float = 1.12
+## Loudness of a running step. Same samples as walking, a bit louder —
+## Joshua's design: feet keep their voices at any speed.
+@export_range(-40.0, 6.0, 0.5) var run_volume_db: float = -3.0
 ## Loudness of the crouch shuffle loop — sneaking should be genuinely quiet.
 @export_range(-60.0, 0.0, 0.5) var shuffle_volume_db: float = -18.0
 
@@ -62,11 +60,10 @@ var _terrain: TerrainSettings = null
 var _step_player: AudioStreamPlayer3D = null
 var _air_player: AudioStreamPlayer3D = null
 var _shuffle_player: AudioStreamPlayer3D = null
-## Plays a surface's continuous movement track ("footsteps/<surface>_loop"),
-## which — when the file exists — REPLACES per-step one-shots on that surface
-## for walk and run alike (Joshua's call for sand, 2026-08-15): the track
-## runs while moving and stops at rest, louder and slightly faster at a run.
-var _move_loop_player: AudioStreamPlayer3D = null
+## One player per foot (0 = left, 1 = right), so each foot keeps its own
+## dedicated sample ("<surface>_left.wav" / "<surface>_right.wav") and a fast
+## run cadence can overlap the tail of the previous step.
+var _foot_players: Array[AudioStreamPlayer3D] = []
 
 var _planar_speed: float = 0.0
 var _crouched: bool = false
@@ -90,17 +87,16 @@ func _ready() -> void:
 	_shuffle_player = _make_player()
 	_shuffle_player.stream = SoundBank.stream("movement/crouch_shuffle_loop.ogg", true)
 	_shuffle_player.volume_db = shuffle_volume_db
-	_move_loop_player = _make_player()
+	_foot_players = [_make_player(), _make_player()]
 
 
 ## Called by the owning Player every physics tick with the state the sounds
-## follow. Runs the shuffle and movement loops; per-step one-shots arrive by
+## follow. Runs the shuffle loop; per-step one-shots arrive by
 ## [method on_foot_planted].
 func tick(_delta: float, planar_speed: float, crouched: bool, footed: bool) -> void:
 	_planar_speed = planar_speed
 	_crouched = crouched
 	_footed = footed
-	_update_move_loop()
 	var wants_shuffle: bool = crouched and footed and planar_speed > 0.3
 	if wants_shuffle == _shuffling:
 		return
@@ -113,34 +109,10 @@ func tick(_delta: float, planar_speed: float, crouched: bool, footed: bool) -> v
 		_shuffle_player.stop()
 
 
-## The continuous movement track for a surface, or null if that surface uses
-## per-step one-shots.
-func _movement_loop(surface: String) -> AudioStream:
-	var found: AudioStream = SoundBank.stream("footsteps/%s_loop.wav" % surface, true)
-	if found == null:
-		found = SoundBank.stream("footsteps/%s_loop.ogg" % surface, true)
-	return found
-
-
-func _update_move_loop() -> void:
-	var moving: bool = _footed and not _crouched and _planar_speed > 0.3
-	var loop: AudioStream = _movement_loop(_surface) if moving else null
-	if loop == null:
-		if _move_loop_player.playing:
-			_move_loop_player.stop()
-		return
-	var running: bool = _planar_speed > run_speed_threshold
-	_move_loop_player.volume_db = run_volume_db if running else walk_volume_db
-	_move_loop_player.pitch_scale = run_loop_pitch if running else 1.0
-	if _move_loop_player.stream != loop:
-		_move_loop_player.stop()
-		_move_loop_player.stream = loop
-	if not _move_loop_player.playing:
-		_move_loop_player.play()
-
-
 ## Called (via the Player's wiring) on the FootstepStamper's plant edge.
-func on_foot_planted(world_xz: Vector2) -> void:
+## `foot` is 0 = left, 1 = right, straight from the print system — the same
+## event that stamps that foot's print fires that foot's sound.
+func on_foot_planted(foot: int, world_xz: Vector2) -> void:
 	if _crouched:
 		return
 	var running: bool = _planar_speed > run_speed_threshold
@@ -150,16 +122,27 @@ func on_foot_planted(world_xz: Vector2) -> void:
 	steps_played += 1
 	var at: Vector3 = Vector3(world_xz.x, global_position.y, world_xz.y)
 	noise_made.emit(at, 1.0 if running else 0.5)
-	if _movement_loop(_surface) != null:
-		# This surface plays its continuous track instead of per-step shots.
+
+	# Preferred mode (Joshua's design, 2026-08-15): each foot owns one fixed
+	# sample per surface, so the step pattern is as deterministic as the
+	# prints it rides on. Running keeps the identical samples, just louder.
+	var own: AudioStream = SoundBank.stream(
+		"footsteps/%s_%s.wav" % [_surface, "left" if foot == 0 else "right"]
+	)
+	if own != null:
+		var player: AudioStreamPlayer3D = _foot_players[foot]
+		player.stream = own
+		player.volume_db = last_step_volume_db
+		player.global_position = at
+		player.play()
 		return
+
+	# Fallback for surfaces without per-foot samples: the numbered take set,
+	# with walk takes reused at run loudness when no run set exists.
 	var takes: AudioStreamRandomizer = SoundBank.take_set(
 		"footsteps/%s_%s" % [_surface, "run" if running else "walk"]
 	)
 	if takes == null and running:
-		# No dedicated run set for this surface: reuse its walk takes at run
-		# loudness (Joshua's call, 2026-08-15). A sourced *_run set anywhere
-		# in assets/audio automatically takes precedence over this fallback.
 		takes = SoundBank.take_set("footsteps/%s_walk" % _surface)
 	_play(_step_player, takes, last_step_volume_db, at)
 
