@@ -43,22 +43,27 @@ _subresources={
 "materials": {
 "clay": {
 "use_external/enabled": true,
+"use_external/fallback_path": "res://resources/palette/clay.tres",
 "use_external/path": "res://resources/palette/clay.tres"
 },
 "night_blue": {
 "use_external/enabled": true,
+"use_external/fallback_path": "res://resources/palette/night_blue.tres",
 "use_external/path": "res://resources/palette/night_blue.tres"
 },
 "plaster": {
 "use_external/enabled": true,
+"use_external/fallback_path": "res://resources/palette/plaster.tres",
 "use_external/path": "res://resources/palette/plaster.tres"
 },
 "sand_shadow": {
 "use_external/enabled": true,
+"use_external/fallback_path": "res://resources/palette/sand_shadow.tres",
 "use_external/path": "res://resources/palette/sand_shadow.tres"
 },
 "wood": {
 "use_external/enabled": true,
+"use_external/fallback_path": "res://resources/palette/wood.tres",
 "use_external/path": "res://resources/palette/wood.tres"
 }
 }
