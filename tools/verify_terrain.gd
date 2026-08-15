@@ -259,6 +259,7 @@ func _collision_audit() -> void:
 	var worst_mesh: float = 0.0
 	var worst_field: float = 0.0
 	var misses: int = 0
+	var roofed: int = 0
 	for _i: int in range(2000):
 		var at: Vector2 = Vector2(rng.randf_range(-100.0, 100.0), rng.randf_range(-100.0, 100.0))
 		var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(
@@ -268,13 +269,20 @@ func _collision_audit() -> void:
 		if hit.is_empty():
 			misses += 1
 			continue
+		# Buildings share the world layer with the terrain, and since Phase 6
+		# the homestead stands inside this audit's square. A ray that lands on
+		# a roof is not evidence about HeightMapShape3D, so only chunks count.
+		if not (hit["collider"] is TerrainChunk):
+			roofed += 1
+			continue
 		var hit_y: float = (hit["position"] as Vector3).y
 		worst_mesh = maxf(worst_mesh, absf(hit_y - _mesh_height(settings, at)))
 		worst_field = maxf(worst_field, absf(hit_y - settings.get_surface_height(at)))
 
 	print(
-		"collision: worst vs mesh %.4f m, worst vs analytic field %.4f m, %d/2000 rays missed"
-		% [worst_mesh, worst_field, misses]
+		"collision: worst vs mesh %.4f m, worst vs analytic field %.4f m, "
+		% [worst_mesh, worst_field]
+		+ "%d/2000 rays missed, %d landed on the homestead" % [misses, roofed]
 	)
 	if misses > 0:
 		_fail("collision: %d rays found no ground inside the loaded radius" % misses)

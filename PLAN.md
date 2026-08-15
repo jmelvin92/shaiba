@@ -16,7 +16,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 3 | Character model & animation | `feature/phase-3-character` | ✅ Done (2026-08-13) |
 | 4 | Terrain & chunk streaming | `feature/phase-4-terrain` | ✅ Done (2026-08-13) |
 | 5 | Sand footprint physics | `feature/phase-5-footprints` | ✅ Done (2026-08-14) |
-| 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🟡 In progress — Part 1 (house) |
+| 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🟡 In progress — Part 1 done (awaiting look review), Part 2 needs Meshy assets |
 | 7 | Integration & polish → v0.1 | `feature/phase-7-polish` | 🔲 Not started |
 
 Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `development` · ✅ Done (merged, gate passed)
@@ -203,10 +203,25 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 - **`scenes/world/homestead.tscn`** — house plus furnishing instances, spawned by `LevelRoot` at the seeded homestead centre; player start moves to the courtyard.
 
 **Part 1 exit bar**
-- [ ] `tools/verify_house.gd` passes: doorway passable at walk and run, walls block, stair climbs, cutaway fires on entry and exit with roof transparency asserted.
-- [ ] `verify_terrain` (all modes) and `verify_player` still pass — flattening must not break determinism, seams or the slope audit.
-- [ ] Screenshots at the gameplay camera reviewed by Joshua (approach, doorway, interior with cutaway).
-- [ ] Zero errors/warnings: headless `--import`, per-script `--check-only`, standalone scene runs.
+- [x] `tools/verify_house.gd` passes: doorway passable at walk and run, walls block, stair climbs, cutaway fires on entry and exit with roof transparency asserted. *(All eight checks pass. It earned its keep immediately: the first stair had 0.34 m treads, which look perfectly normal and are unclimbable — the player's step-up probe reads the next riser as a wall — so the upper floor was unreachable and nothing visual showed it. Treads are now 0.48 m and the rule is in ART_DIRECTION.)*
+- [x] `verify_terrain` (all modes) and `verify_player` still pass — flattening did not break determinism, seams or the slope audit. *(World hash unchanged; homestead pad holds 0.084 m of relief with an 11.5° approach against the 31° limit; collision still 0.0000 m off the mesh and 0.047 m off the analytic field. The collision audit learned to ignore rays that land on the homestead — buildings share the world layer, and a ray hitting a roof is not evidence about `HeightMapShape3D`.)*
+- [ ] Screenshots at the gameplay camera reviewed by Joshua (approach, doorway, interior with cutaway). **← the one thing outstanding in Part 1.** Shots are committed at `docs/references/ingame_*.png`.
+- [x] Zero errors/warnings: headless `--import`, per-script `--check-only`, standalone scene runs. *(One exception, recorded in DECISIONS: a bounded 2–3 instance ObjectDB warning at engine shutdown that appears only with the house present and the player spawning near it. Bisected away from every system involved; does not grow with run length; no gameplay effect.)*
+
+**Handoff notes (2026-08-14)**
+
+Part 1 is complete and verified; only Joshua's look review is outstanding. What exists now:
+
+- **The house** (`tools/build_house.py` → `house.blend`/`house.glb`, 2,136 tris) — two storeys, vigas, wood-framed windows, cloth awning, external stair to an upper-floor door. Wall tone is one constant with a `--wall <palette>` override that renders a comparison ladder without touching the committed asset, if Joshua wants to see alternatives to `clay`. In-engine, clay reads well against the sand — better than the Blender previews suggested, so no ladder was forced.
+- **`InteriorCutaway`** — reusable for every future building; nothing per-storey to configure.
+- **Ten furnishing assets**, each independent and reusable, placed as a majlis downstairs and a bedroom upstairs.
+- **The homestead POI** — a levelled pad at a seeded site, with the player spawning in its courtyard.
+
+Loose ends worth knowing about, none blocking:
+- The **roof is decorative** — the stair stops at the upper-floor landing. Roof access is a future addition (a second short flight, or a stairhead).
+- The interior is lit only by ambient and what comes through the door and windows. It reads fine at the gameplay camera; if it ever feels gloomy, the oil lamp is the obvious place to hang a small `OmniLight3D`.
+- **Per-prop `.tscn` wrappers do not exist yet** — furnishings are instanced from their `.glb` directly. When a prop first needs behaviour (an interactable lamp), that is the moment to add `scenes/props/<name>/<name>.tscn`.
+- No date palm, well or rocks yet; Joshua chose to pick small props as we go.
 
 ### Part 2 — Camel & the missing player clips
 

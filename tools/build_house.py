@@ -93,12 +93,21 @@ WIN_H = 1.20
 GROUND_SILL = 1.00     # window sill height on the ground floor
 UPPER_SILL = UPPER_BASE + 0.95
 
-# Stair: 11 risers from the ground to the upper floor landing. 0.277 m rise
-# against a 0.34 m tread is steep — exterior adobe stairs are — but well inside
-# the player's 0.35 m step-up, which Phase 3 verified climbs cleanly.
+# Stair: 11 risers from the ground to the upper floor landing.
+#
+# The tread is the load-bearing number, and it is set by the player's step-up
+# rather than by taste. That probe raises the capsule and pushes it forward by
+# its own radius plus the probe margin (0.35 + 0.06 m) to find the tread; if
+# the next riser is inside that reach, the probe hits it and concludes the step
+# is a wall, so the player stops dead at the bottom of the flight. Treads must
+# therefore clear ~0.41 m. At 0.34 m — a perfectly normal-looking stair — this
+# staircase was unclimbable, which is exactly the kind of failure that only a
+# scripted walk finds (tools/verify_house.gd). 0.48 m leaves real margin and
+# gives a 30 deg flight, gentler than the steep exterior stairs of the
+# reference but the one that can actually be used.
 STAIR_STEPS = 11
 STAIR_RISE = UPPER_BASE / STAIR_STEPS
-STAIR_TREAD = 0.34
+STAIR_TREAD = 0.48
 STAIR_W = 1.30
 STAIR_Y0 = 3.30        # bottom step starts here and the flight climbs toward -Y
 LANDING_D = 1.30

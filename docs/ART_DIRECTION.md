@@ -47,6 +47,11 @@ A reference anchors **proportion, silhouette and the set of features** — never
 - Slight imperfection is cozy: gently tilt/scale prop instances, avoid perfect right angles on organic/handmade things (mud-brick walls can bulge a little).
 - Scale: **1 Blender unit = 1 meter = 1 Godot meter.** Player character ≈ 1.75 m tall. Model at real-world scale, always.
 
+**Anything the player walks on has gameplay dimensions, not just visual ones:**
+- **Stair treads must be deeper than ~0.41 m** and risers no taller than 0.35 m. The player's step-up probe raises the capsule and reaches forward by its own radius plus the probe margin (0.35 + 0.06 m) to find the tread; a shallower tread puts the next riser inside that reach, the probe reads it as a wall, and the player stops dead at the bottom of the flight. A 0.34 m tread looks completely normal and is completely unclimbable — Phase 6 shipped one by accident and only a scripted walk found it.
+- **Doorways**: 1.1 m wide clear of jambs and 2.1 m tall clear of the lintel comfortably passes the 0.7 m-wide capsule at both gaits.
+- Interior ceilings at 2.6 m give a 1.75 m character real headroom at the gameplay camera.
+
 ## Blender → Godot export checklist (follow exactly, every asset)
 
 1. Model at origin, feet/base at Z=0, facing **+Y** in Blender. Blender's glTF exporter maps `(x, y, z)` → `(x, z, −y)`, so **+Y in Blender becomes −Z in Godot**, which is Godot's forward. (This step used to say −Y; that is the opposite, and it would have shipped every asset facing backwards. Caught in Phase 3.)
