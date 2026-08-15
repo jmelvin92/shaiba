@@ -73,6 +73,7 @@ func _run() -> void:
 	await _doorway_passable("run", true, RUN_TICKS)
 	await _walls_block()
 	await _stair_climbs()
+	await _stair_drift_climbs()
 	await _upper_door_enters()
 	await _lanes_are_wide_enough()
 	await _cutaway_closes()
@@ -329,6 +330,46 @@ func _stair_climbs() -> void:
 		% [climbed, local.y, _cutaway.is_open()])
 	if climbed < 2.0:
 		_fail("stair: only climbed %.2f m; the upper floor is unreachable" % climbed)
+
+
+## Drifting onto the flight at an angle, or climbing it while pressed against
+## the house wall or the outer parapet, must still deliver the upper floor.
+##
+## This is Joshua's second "hung up on ledges and stairs" report as a gate.
+## Before the face-square step fallback in player.gd, these entries jammed at
+## the stair's foot or were deflected off the flight; and before the parapet
+## top got its knee in build_house.py, two of them climbed the sagging rail
+## near the stair head and fell off the outside of the flight. A hand on WASD
+## is never aimed perfectly, so an angled climb is the honest test.
+func _stair_drift_climbs() -> void:
+	var runs: Array = [
+		["+15 entry", Vector2(4.2, -4.6), 15.0],
+		["-15 entry", Vector2(5.4, -4.6), -15.0],
+		["+20 cross", Vector2(3.4, -4.6), 20.0],
+		["-20 cross", Vector2(6.1, -4.6), -20.0],
+		["wall bias", Vector2(4.75, -3.6), -10.0],
+		["parapet bias", Vector2(4.75, -3.6), 10.0],
+	]
+	var passed: int = 0
+	var report: PackedStringArray = []
+	for run: Array in runs:
+		var base: Transform3D = _house.global_transform
+		var at: Vector2 = run[1]
+		var start: Vector3 = base * Vector3(at.x, 0.0, at.y)
+		var rad: float = deg_to_rad(run[2])
+		var dir: Vector3 = (base.basis * Vector3(sin(rad), 0.0, cos(rad))).normalized()
+		_aim(start, start + dir * 10.0)
+		await _stand_at(Vector2(start.x, start.z))
+		await _hold("move_up", 380, false)
+		var local: Vector3 = _house.to_local(_player.global_position)
+		var ok: bool = local.y > 2.9
+		if ok:
+			passed += 1
+		report.append("%s%s" % [run[0], "" if ok else " STUCK y=%.2f" % local.y])
+	print("stair drift: %d/%d climbs  [%s]" % [passed, runs.size(), ", ".join(report)])
+	if passed < runs.size():
+		_fail("stair drift: only %d of %d angled climbs reach the top"
+			% [passed, runs.size()])
 
 
 ## How much room for error the doorway and the stair actually give you.
