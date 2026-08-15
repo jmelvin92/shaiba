@@ -193,9 +193,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		# Negated so that dragging right turns the view right: increasing yaw
 		# swings the camera anticlockwise seen from above, which reads as left.
 		_pending_yaw += drag if invert_orbit else -drag
-	elif event.is_action_pressed("camera_zoom_in"):
+	# allow_echo, so holding a bound key (+/-) keeps stepping the way repeated
+	# scroll notches do; wheel events never echo, so they are unaffected.
+	elif event.is_action_pressed("camera_zoom_in", true):
 		_zoom_goal = clampf(_zoom_goal - zoom_step, zoom_min, zoom_max)
-	elif event.is_action_pressed("camera_zoom_out"):
+	elif event.is_action_pressed("camera_zoom_out", true):
 		_zoom_goal = clampf(_zoom_goal + zoom_step, zoom_min, zoom_max)
 
 
