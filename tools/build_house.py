@@ -82,12 +82,25 @@ ROOF_TOP = UPPER_TOP + ROOF_T             # 6.05
 PARAPET_H = 0.60
 PARAPET_T = 0.30
 FOUNDATION = 0.25      # slab buried below z=0 so no gap can show under a wall
+# The interior floor stands this far proud of the ground the house is placed
+# on. Two jobs: a floor exactly level with the terrain z-fights with it, and
+# any residual unevenness in the ground leaves sand standing through the floor
+# — which is precisely what happened when this was 0. It also gives the
+# doorway an honest threshold to step over, the way a real adobe house does.
+FLOOR_LIFT = 0.12
 
 UPPER_HALF_X = HALF_X - INSET
 UPPER_HALF_Y = HALF_Y - INSET
 
 DOOR_W = 1.10
-DOOR_H = 2.10
+# Tall enough for the step-up probe, not just for the player. Crossing the
+# threshold makes the controller raise the capsule by max_step_height (0.35 m)
+# and push it forward to feel for the tread — so the doorway has to clear the
+# player's 1.75 m *plus* that lift, above the threshold, or the raised capsule
+# hits the lintel, the probe calls the step a wall, and the door is shut. At
+# 2.10 m it was exactly that: passable with a flush floor, blocked the moment
+# the floor was lifted 12 cm.
+DOOR_H = 2.40
 WIN_W = 1.20
 WIN_H = 1.20
 GROUND_SILL = 1.00     # window sill height on the ground floor
@@ -279,7 +292,7 @@ def build_ground_floor(materials: dict) -> bpy.types.Object:
     and still appeared to be standing on the desert.
     """
     part = Part("ground_floor")
-    part.box((-HALF_X, -HALF_Y, -FOUNDATION), (HALF_X, HALF_Y, 0.0), WALL)
+    part.box((-HALF_X, -HALF_Y, -FOUNDATION), (HALF_X, HALF_Y, FLOOR_LIFT), WALL)
     return part.emit(materials)
 
 

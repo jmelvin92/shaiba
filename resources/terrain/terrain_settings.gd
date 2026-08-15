@@ -244,6 +244,11 @@ func get_surface_height(world_xz: Vector2) -> float:
 	var depth: float = get_sand_depth(world_xz)
 	var ripple: float = ripple_amplitude * ripple_noise.get_noise_2d(world_xz.x, world_xz.y)
 	ripple *= smoothstep(0.0, ripple_fade_depth, depth)
+	# Ripples die on the homestead pad. Levelling the base and the sand depth
+	# still left a few centimetres of wind texture, which is nothing in open
+	# desert and everything under a building: a flat-bottomed floor slab laid
+	# on it has sand standing proud of it across most of its area.
+	ripple *= 1.0 - _homestead_weight(world_xz)
 	return get_base_height(world_xz) + depth + ripple
 
 

@@ -17,6 +17,10 @@ extends SceneTree
 ## covers the longest leg here (nine metres of courtyard) at walking pace.
 const WALK_TICKS: int = 260
 const RUN_TICKS: int = 150
+## How far the interior floor stands above the ground the house is placed on —
+## FLOOR_LIFT in tools/build_house.py. Kept in step with it by the floor-vs-sand
+## check below, which fails loudly if the two ever disagree.
+const HOUSE_FLOOR_LIFT: float = 0.12
 
 var _failures: PackedStringArray = []
 var _level: Node3D = null
@@ -63,6 +67,7 @@ func _run() -> void:
 		await physics_frame
 
 	await _spawn_check()
+	_floor_clears_the_sand()
 	await _doorway_passable("walk", false, WALK_TICKS)
 	await _doorway_passable("run", true, RUN_TICKS)
 	await _walls_block()
@@ -83,6 +88,36 @@ func _spawn_check() -> void:
 			% [distance, _terrain.homestead_radius])
 	if _cutaway.is_open():
 		_fail("the building is already open at spawn; the player starts outside")
+
+
+## The interior floor must stand clear of the desert underneath it.
+##
+## This is the bug that made the ground floor "still sand" after its material
+## was already correct: the slab sat flush with the terrain, and a few
+## centimetres of ripple left sand drawn proud of the floor across almost the
+## whole footprint. Nothing about the model was wrong, which is exactly why it
+## survived a material fix — so the clearance is asserted rather than eyeballed.
+func _floor_clears_the_sand() -> void:
+	var floor_y: float = _house.to_global(Vector3(0.0, HOUSE_FLOOR_LIFT, 0.0)).y
+	var above: int = 0
+	var worst: float = -INF
+	var samples: int = 0
+	for ix: int in range(-7, 8):
+		for iz: int in range(-6, 7):
+			var at: Vector3 = _house.to_global(Vector3(ix * 0.5, 0.0, iz * 0.5))
+			var ground: float = _terrain.get_surface_height(Vector2(at.x, at.z))
+			worst = maxf(worst, ground - floor_y)
+			samples += 1
+			if ground > floor_y:
+				above += 1
+	print("floor vs sand: %d/%d samples of desert above the floor, closest %+.3f m"
+		% [above, samples, worst])
+	if above > 0:
+		_fail(
+			"the desert stands above the interior floor at %d of %d points "
+			% [above, samples]
+			+ "(by up to %.3f m) — the floor will read as sand" % worst
+		)
 
 
 ## Walks in through the front door and out again, at one gait.
