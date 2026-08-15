@@ -1,0 +1,39 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scenes/props/door/door.gd" id="1_door"]
+[ext_resource type="PackedScene" uid="uid://85apehukpxyl" path="res://assets/models/door.glb" id="2_model"]
+[ext_resource type="Script" path="res://scenes/props/interactable.gd" id="3_interactable"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_leaf"]
+size = Vector3(1.26, 2.22, 0.06)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_reach"]
+size = Vector3(1.9, 2.2, 2)
+
+[node name="Door" type="Node3D"]
+script = ExtResource("1_door")
+
+[node name="Leaf" type="Node3D" parent="."]
+
+[node name="Model" parent="Leaf" instance=ExtResource("2_model")]
+
+[node name="Body" type="AnimatableBody3D" parent="Leaf"]
+collision_layer = 5
+collision_mask = 0
+sync_to_physics = false
+
+[node name="Shape" type="CollisionShape3D" parent="Leaf/Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.64, 1.13, 0)
+shape = SubResource("BoxShape3D_leaf")
+
+[node name="Interactable" type="Area3D" parent="."]
+collision_layer = 8
+collision_mask = 0
+monitoring = false
+script = ExtResource("3_interactable")
+prompt = "Open"
+prompt_anchor = Vector3(0.65, 2.55, 0)
+
+[node name="Reach" type="CollisionShape3D" parent="Interactable"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.64, 1.15, 0)
+shape = SubResource("BoxShape3D_reach")

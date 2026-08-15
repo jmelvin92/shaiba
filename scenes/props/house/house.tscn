@@ -1,6 +1,7 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://scenes/props/house/house.gd" id="1_house"]
+[ext_resource type="PackedScene" path="res://scenes/props/door/door.tscn" id="14_door"]
 [ext_resource type="PackedScene" uid="uid://cov78ohdr8lmr" path="res://assets/models/house.glb" id="2_model"]
 [ext_resource type="Script" path="res://scenes/props/interior_cutaway.gd" id="3_cutaway"]
 [ext_resource type="PackedScene" uid="uid://bkba4pi3j4cjc" path="res://assets/models/rug.glb" id="4_rug"]
@@ -21,6 +22,13 @@ size = Vector3(7, 5.7, 6)
 script = ExtResource("1_house")
 
 [node name="Model" parent="." instance=ExtResource("2_model")]
+
+[node name="FrontDoor" parent="." instance=ExtResource("14_door")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.74, 0.12, -3.42)
+
+[node name="UpperDoor" parent="." instance=ExtResource("14_door")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 3.77, 3.05, 1.59)
+fadeable = false
 
 [node name="Cutaway" type="Node3D" parent="."]
 script = ExtResource("3_cutaway")

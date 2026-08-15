@@ -42,6 +42,11 @@ const LAYER_FADEABLE: int = 5
 ## plane and stays, the bed upstairs is above it and goes. Nothing here has to
 ## know which storey anything is on.
 @export var furnishings_path: NodePath = ^"Furnishings"
+## The building's [Door] instances. Each door manages itself (swing, collision,
+## interaction); the house only needs to know about the ones whose `fadeable`
+## export is off, because those adopt the cutaway's management the way the wall
+## around them does — see _ready.
+@export var doors: Array[NodePath] = [^"FrontDoor", ^"UpperDoor"]
 ## The cutaway that opens the building up. Optional: a building without one is
 ## simply never enterable, and everything else here still works.
 @export var cutaway_path: NodePath = ^"Cutaway"
@@ -71,6 +76,16 @@ func _ready() -> void:
 		for piece: Node in furnishings.get_children():
 			_collect_visuals(piece, managed)
 			_set_layer_deep(piece, LAYER_WORLD)
+
+	# A door follows the wall it is mounted in. The front door sits in a
+	# fader-managed ground wall, so it keeps its own occluder layer; the upper
+	# door sits in a cutaway-managed wall (its instance sets `fadeable` off),
+	# so its leaf is handed to the cutaway here and vanishes with its storey
+	# instead of floating in mid-air once the walls around it are gone.
+	for path: NodePath in doors:
+		var door: Door = get_node_or_null(path) as Door
+		if door != null and not door.fadeable:
+			managed.append_array(door.get_visuals())
 
 	var cutaway: InteriorCutaway = get_node_or_null(cutaway_path) as InteriorCutaway
 	if cutaway == null:
