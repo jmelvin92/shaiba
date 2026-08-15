@@ -92,7 +92,7 @@ FLOOR_LIFT = 0.12
 UPPER_HALF_X = HALF_X - INSET
 UPPER_HALF_Y = HALF_Y - INSET
 
-DOOR_W = 1.10
+DOOR_W = 1.30
 # Tall enough for the step-up probe, not just for the player. Crossing the
 # threshold makes the controller raise the capsule by max_step_height (0.35 m)
 # and push it forward to feel for the tread — so the doorway has to clear the
@@ -121,7 +121,11 @@ UPPER_SILL = UPPER_BASE + 0.95
 STAIR_STEPS = 11
 STAIR_RISE = UPPER_BASE / STAIR_STEPS
 STAIR_TREAD = 0.48
-STAIR_W = 1.30
+# Wide enough that the 0.70 m-wide player has room to drift. The flight runs
+# against the house wall on one side and its own parapet on the other, so the
+# usable lane is the width less a body diameter — at 1.30 m that left 0.60 m,
+# which is easy to wander out of half way up.
+STAIR_W = 1.50
 STAIR_Y0 = 3.30        # bottom step starts here and the flight climbs toward -Y
 LANDING_D = 1.30
 

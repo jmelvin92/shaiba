@@ -72,6 +72,7 @@ func _run() -> void:
 	await _doorway_passable("run", true, RUN_TICKS)
 	await _walls_block()
 	await _stair_climbs()
+	await _lanes_are_wide_enough()
 	await _cutaway_closes()
 	await _layers_are_sane()
 
@@ -190,6 +191,65 @@ func _stair_climbs() -> void:
 		% [climbed, local.y, _cutaway.is_open()])
 	if climbed < 2.0:
 		_fail("stair: only climbed %.2f m; the upper floor is unreachable" % climbed)
+
+
+## How much room for error the doorway and the stair actually give you.
+##
+## Joshua's report was "I get hung up on ledges and stairs", and the cause was
+## not that either was impassable — dead centre, both worked. It was that the
+## band you had to hit was far narrower than it looked: 0.12 m of usable width
+## in a doorway with 0.20 m of geometric slack, the difference being contact
+## the body was only sliding along. A single centred walk-through cannot see
+## that, so the approach is swept across several lanes and the *width that
+## works* is the measurement.
+func _lanes_are_wide_enough() -> void:
+	var forward: Vector3 = -_house.global_transform.basis.z
+	var side: Vector3 = _house.global_transform.basis.x
+
+	var door_lanes: PackedFloat32Array = [-1.30, -1.20, -1.10, -1.00]
+	var door_ok: int = await _sweep_lanes(
+		"doorway", door_lanes, forward * 9.0, -forward, WALK_TICKS,
+		func(local: Vector3) -> bool: return local.z > -2.5
+	)
+	if door_ok < door_lanes.size():
+		_fail("doorway: only %d of %d approach lanes get through"
+			% [door_ok, door_lanes.size()])
+
+	var stair_lanes: PackedFloat32Array = [4.45, 4.65, 4.85, 5.05]
+	var stair_ok: int = await _sweep_lanes(
+		"stair", stair_lanes, forward * 4.1, -forward, 340,
+		func(local: Vector3) -> bool: return local.y > 2.5
+	)
+	if stair_ok < stair_lanes.size():
+		_fail("stair: only %d of %d approach lanes reach the top"
+			% [stair_ok, stair_lanes.size()])
+
+
+## Walks each lane and counts how many satisfy [param arrived].
+func _sweep_lanes(
+	label: String,
+	lanes: PackedFloat32Array,
+	offset: Vector3,
+	heading: Vector3,
+	ticks: int,
+	arrived: Callable,
+) -> int:
+	var side: Vector3 = _house.global_transform.basis.x
+	var passed: int = 0
+	var report: PackedStringArray = []
+	for lane: float in lanes:
+		var start: Vector3 = _house.global_position + offset + side * lane
+		_aim(start, start + heading * 10.0)
+		await _stand_at(Vector2(start.x, start.z))
+		await _hold("move_up", ticks, false)
+		var local: Vector3 = _house.to_local(_player.global_position)
+		var ok: bool = arrived.call(local)
+		if ok:
+			passed += 1
+		report.append("%.2f%s" % [lane, "" if ok else " STUCK"])
+	print("%s lanes: %d/%d pass  [%s]"
+		% [label, passed, lanes.size(), ", ".join(report)])
+	return passed
 
 
 ## The building must close up again once the player leaves — and while they are

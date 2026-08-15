@@ -72,6 +72,11 @@ const STEP_CLEARANCE: float = 0.02
 ## deliberately short: looking half a metre ahead used to lift the body while it
 ## was still well clear of the step, which reads as floating up to the stairs.
 @export_range(0.01, 0.3, 0.01) var step_probe_margin: float = 0.06
+## How much slimmer the step probe's body is than the real one, metres. This is
+## the width of contact the probe is allowed to ignore — enough to slide along
+## a door jamb or the wall a stair runs against without that contact being
+## mistaken for the obstacle in front.
+@export_range(0.0, 0.2, 0.01) var step_probe_slim: float = 0.07
 ## How quickly the mesh catches up after the collider steps up (higher =
 ## snappier). The collider has to move in one tick or the physics is wrong, but
 ## the character we actually see slides that height off over a moment instead.
@@ -404,37 +409,28 @@ func _try_step_up(planar_velocity: Vector3, delta: float) -> void:
 	# ahead lifts the body while it is still short of the step, which reads as
 	# floating up to the stairs.
 	var direction: Vector3 = planar_velocity.normalized()
-	var motion: Vector3 = direction * (planar_velocity.length() * delta + step_probe_margin)
 
-	# Walkable slopes are left to move_and_slide, so climbing them keeps its
-	# natural along-the-slope speed instead of being lifted straight up.
-	var ahead: KinematicCollision3D = KinematicCollision3D.new()
-	if not test_move(global_transform, motion, ahead):
-		return
-	if ahead.get_normal().angle_to(Vector3.UP) <= floor_max_angle:
-		return
+	# The probe runs against a slightly slimmer body than we collide with.
+	#
+	# It asks one question — "is there a step in front of me?" — by sweeping
+	# the capsule, and at full width anything merely *brushing* the body's side
+	# answers it too. So taking a step while grazing a door jamb, or the house
+	# wall an outside stair runs against, reports "blocked" and the step is
+	# read as a wall: the player stops dead half-in a doorway or part-way up a
+	# flight, for no reason they can see. Measured before this: a doorway with
+	# 0.20 m of geometric slack had only 0.12 m you could actually walk
+	# through, the difference being contact the body was merely sliding along.
+	#
+	# The probe's reach is widened by the same amount, so it still meets a real
+	# obstacle at exactly the distance it used to.
+	var full_radius: float = _capsule.radius
+	var motion: Vector3 = direction * (
+		planar_velocity.length() * delta + step_probe_margin + step_probe_slim
+	)
+	_capsule.radius = maxf(full_radius - step_probe_slim, 0.05)
+	var rise: float = _measure_step(direction, motion, full_radius)
+	_capsule.radius = full_radius
 
-	var headroom: Vector3 = Vector3.UP * max_step_height
-	if test_move(global_transform, headroom):
-		return
-
-	# Measuring the tread needs a longer reach than moving does: the capsule
-	# only sits over the step once its centre has cleared its own radius past
-	# the face, and probing any shorter measures the face instead of the tread.
-	var over: Vector3 = direction * (_capsule.radius + step_probe_margin)
-	var raised: Transform3D = global_transform
-	raised.origin += headroom
-	if test_move(raised, over):
-		# Still blocked from up there, so it is a wall rather than a step.
-		return
-
-	raised.origin += over
-	var tread: KinematicCollision3D = KinematicCollision3D.new()
-	if not test_move(raised, -headroom, tread):
-		# Nothing to stand on over there — a gap, not a step.
-		return
-
-	var rise: float = max_step_height - tread.get_travel().length()
 	if rise <= 0.001:
 		return
 	# Raising by the step's own height would leave the capsule exactly flush with
@@ -442,3 +438,40 @@ func _try_step_up(planar_velocity: Vector3, delta: float) -> void:
 	global_position.y += rise + STEP_CLEARANCE
 	# Don't let leftover downward velocity pull us straight back off the tread.
 	velocity.y = maxf(velocity.y, 0.0)
+
+
+## How far the body must rise to stand on what is blocking it, or -1 if there
+## is nothing there, nothing to stand on, or a wall rather than a step.
+##
+## [param full_radius] is the body's real radius, which the forward reach is
+## measured against even while the probe itself runs slim.
+func _measure_step(direction: Vector3, motion: Vector3, full_radius: float) -> float:
+	# Walkable slopes are left to move_and_slide, so climbing them keeps its
+	# natural along-the-slope speed instead of being lifted straight up.
+	var ahead: KinematicCollision3D = KinematicCollision3D.new()
+	if not test_move(global_transform, motion, ahead):
+		return -1.0
+	if ahead.get_normal().angle_to(Vector3.UP) <= floor_max_angle:
+		return -1.0
+
+	var headroom: Vector3 = Vector3.UP * max_step_height
+	if test_move(global_transform, headroom):
+		return -1.0
+
+	# Measuring the tread needs a longer reach than moving does: the capsule
+	# only sits over the step once its centre has cleared its own radius past
+	# the face, and probing any shorter measures the face instead of the tread.
+	var over: Vector3 = direction * (full_radius + step_probe_margin)
+	var raised: Transform3D = global_transform
+	raised.origin += headroom
+	if test_move(raised, over):
+		# Still blocked from up there, so it is a wall rather than a step.
+		return -1.0
+
+	raised.origin += over
+	var tread: KinematicCollision3D = KinematicCollision3D.new()
+	if not test_move(raised, -headroom, tread):
+		# Nothing to stand on over there — a gap, not a step.
+		return -1.0
+
+	return max_step_height - tread.get_travel().length()
