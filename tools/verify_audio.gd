@@ -204,8 +204,8 @@ func _check_courtyard_surface() -> void:
 	var depth: float = _terrain.get_sand_depth(here)
 	var surface: String = _footsteps.resolve_surface(here)
 	_check(
-		"courtyard resolves 'packed' (depth %.2f m, got '%s')" % [depth, surface],
-		surface == "packed"
+		"courtyard resolves 'sand' (depth %.2f m, got '%s')" % [depth, surface],
+		surface == "sand"
 	)
 
 

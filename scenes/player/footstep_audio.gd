@@ -46,11 +46,13 @@ signal noise_made(world_position: Vector3, loudness: float)
 @export_range(-40.0, 6.0, 0.5) var land_hard_volume_db: float = 0.0
 
 @export_group("Surface")
-## Sand shallower than this sounds like packed earth rather than soft drift,
-## metres. The homestead courtyard measures ~0.25 m after its POI thinning and
-## dune bodies 0.6+, so 0.35 splits them with margin — and desert thin-skins
-## under it sounding firm is the two-layer sand model working as intended.
-@export_range(0.02, 1.0, 0.01) var packed_sand_depth: float = 0.35
+## Sand shallower than this counts as bare packed ground instead of sand,
+## metres. Near zero on purpose (lesson of 2026-08-15): an earlier 0.35
+## threshold classified the whole flattened homestead surround as "packed" —
+## a surface with no sound files — so the game fell silent exactly where
+## Joshua play-tested. Now everything with real sand on it sounds like sand,
+## the same rule footprints follow; only print-less hard ground differs.
+@export_range(0.0, 1.0, 0.01) var packed_sand_depth: float = 0.05
 
 ## Terrain query source, handed down by the Player (which got it from the
 ## level). Null on levels without terrain, where every ray answer comes from
