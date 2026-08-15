@@ -35,6 +35,14 @@ signal foot_planted(world_xz: Vector2)
 @export_range(0.1, 0.9, 0.05) var plant_fraction: float = 0.5
 ## …and must exceed this fraction again before it can plant again.
 @export_range(0.2, 1.5, 0.05) var unplant_fraction: float = 0.85
+## …and must also have TRAVELLED this far since its own last plant, metres.
+## The speed thresholds alone chatter at low body speeds (turning in place, a
+## slow indoor shuffle): a hovering foot re-plants in the same spot several
+## times a second. Prints hid that — a stamp on top of itself is invisible —
+## but Phase 6.6 made every plant audible, and a double step is very not.
+## Same-foot plants sit ~1.3 m apart at a normal walk, so 0.25 m only ever
+## rejects plants that didn't come from a real stride.
+@export_range(0.0, 1.0, 0.05) var min_step_distance: float = 0.25
 
 @export_group("Deep-sand drag")
 ## Wading factor (0–1, from the player's sand depth) where dragging begins.
@@ -54,6 +62,9 @@ var _skeleton: Skeleton3D = null
 var _bones: Array[int] = []
 var _previous: Array[Vector2] = []
 var _planted: Array[bool] = [true, true]
+## Where each foot last made a counted plant, for the travel gate. Starts far
+## away so the first real plant always counts.
+var _last_plant: Array[Vector2] = [Vector2(1e9, 1e9), Vector2(1e9, 1e9)]
 var _drag_travelled: float = 0.0
 
 
@@ -89,8 +100,10 @@ func tick(delta: float, velocity: Vector3, footed: bool, wade: float) -> void:
 				_planted[foot] = false
 		elif foot_speed < plant_fraction * body_speed:
 			_planted[foot] = true
-			stamped.emit(at, foot_radius, foot_strength, travel_angle, foot_stretch)
-			foot_planted.emit(at)
+			if at.distance_to(_last_plant[foot]) >= min_step_distance:
+				_last_plant[foot] = at
+				stamped.emit(at, foot_radius, foot_strength, travel_angle, foot_stretch)
+				foot_planted.emit(at)
 
 	if wade >= drag_wade_min:
 		_drag_travelled += body_speed * delta
