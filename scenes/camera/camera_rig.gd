@@ -9,6 +9,11 @@ extends Node3D
 ## NOT move to avoid geometry: anything blocking the view is faded instead, by
 ## the OccluderFader child. See docs/DECISIONS.md.
 ##
+## The player orbits it freely around the target with a left-click drag. The
+## **pitch stays fixed** while they do — this is a turntable, not free-look, so
+## the diorama framing the whole art direction rests on cannot be lost, and
+## there is no angle from which the camera can end up under the sand.
+##
 ## The rig never searches the tree for its target: whoever instances it calls
 ## [method set_target]. Everything runs in _physics_process so the camera and
 ## the player it follows update on the same tick; physics interpolation then
@@ -32,9 +37,20 @@ signal yaw_changed(yaw: float)
 ## shows no background at all.
 @export_range(10.0, 80.0, 0.5) var pitch_degrees: float = 19.0:
 	set = set_pitch_degrees
-## Rotation of the rig around the world Y axis, degrees.
-@export_range(0.0, 360.0, 45.0) var yaw_degrees: float = 0.0:
+## Rotation of the rig around the world Y axis, degrees. Free — the player
+## orbits it with a left-click drag (see the Orbit group), so this is a
+## continuous value rather than the 45 deg detents originally planned.
+@export_range(0.0, 360.0, 1.0) var yaw_degrees: float = 0.0:
 	set = set_yaw_degrees
+
+@export_group("Orbit")
+## Degrees of yaw per pixel of horizontal drag. 0.25 puts a half-turn in about
+## 720 px — roughly one comfortable sweep of the hand across a trackpad.
+@export_range(0.02, 1.0, 0.01) var orbit_sensitivity: float = 0.25
+## Drag right turns the view right by default, the way a mouse-look camera
+## does. Flip this if it reads backwards — some players expect a drag to grab
+## the world and spin it the other way, and it is purely a matter of taste.
+@export var invert_orbit: bool = false
 
 @export_group("Terrain")
 ## Minimum height the camera keeps above the sand, metres. At a 19° pitch the
@@ -75,6 +91,15 @@ var _terrain: TerrainSettings = null
 var _follow_position: Vector3 = Vector3.ZERO
 ## Smoothed extra height currently applied to clear the sand.
 var _lift: float = 0.0
+## True while the player is holding the orbit button and dragging.
+var _orbiting: bool = false
+## Where the cursor was grabbed, so it can be put back on release.
+var _grab_position: Vector2 = Vector2.ZERO
+## Drag collected since the last physics tick, degrees. Mouse motion arrives at
+## the render rate; banking it and applying it once per tick keeps the rig on
+## the same 60 Hz beat as the player it follows, which is what stops the two
+## from jittering relative to each other (docs/DECISIONS.md).
+var _pending_yaw: float = 0.0
 
 
 func _ready() -> void:
@@ -130,6 +155,12 @@ func set_pitch_degrees(value: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _pending_yaw != 0.0:
+		# Applied whole, with no damping: a drag that lags behind the hand
+		# feels rubbery rather than smooth. Physics interpolation is what
+		# carries the rotation to the render rate.
+		set_yaw_degrees(fposmod(yaw_degrees + _pending_yaw, 360.0))
+		_pending_yaw = 0.0
 	if _target == null:
 		return
 	var goal: Vector3 = _target.global_position + follow_offset
@@ -153,10 +184,47 @@ func _needed_lift() -> float:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("camera_zoom_in"):
+	if event.is_action_pressed("camera_orbit"):
+		_begin_orbit()
+	elif event.is_action_released("camera_orbit"):
+		_end_orbit()
+	elif _orbiting and event is InputEventMouseMotion:
+		var drag: float = (event as InputEventMouseMotion).relative.x * orbit_sensitivity
+		# Negated so that dragging right turns the view right: increasing yaw
+		# swings the camera anticlockwise seen from above, which reads as left.
+		_pending_yaw += drag if invert_orbit else -drag
+	elif event.is_action_pressed("camera_zoom_in"):
 		_zoom_goal = clampf(_zoom_goal - zoom_step, zoom_min, zoom_max)
 	elif event.is_action_pressed("camera_zoom_out"):
 		_zoom_goal = clampf(_zoom_goal + zoom_step, zoom_min, zoom_max)
+
+
+## Grabs the mouse for the duration of a drag.
+##
+## Capturing rather than merely hiding it means a long spin never runs out of
+## desk or off the edge of the window, and the cursor is warped back to where
+## it was grabbed on release, so the pointer does not appear to teleport.
+func _begin_orbit() -> void:
+	if _orbiting:
+		return
+	_orbiting = true
+	_grab_position = get_viewport().get_mouse_position()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _end_orbit() -> void:
+	if not _orbiting:
+		return
+	_orbiting = false
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	Input.warp_mouse(_grab_position)
+
+
+## Losing focus mid-drag would otherwise leave the mouse captured with no way
+## to release it, since the button-up lands in another window.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_end_orbit()
 
 
 func _apply_yaw() -> void:

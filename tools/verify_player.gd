@@ -68,6 +68,15 @@ func _run() -> void:
 		await _stairs()
 		quit()
 		return
+	if OS.get_cmdline_user_args().has("--orbit"):
+		await _orbit(level)
+		print("\n=== result ===")
+		for line: String in _failures:
+			print("FAIL  %s" % line)
+		if _failures.is_empty():
+			print("all checks passed")
+		quit(0 if _failures.is_empty() else 1)
+		return
 	if OS.get_cmdline_user_args().has("--graybox"):
 		await _graybox()
 		print("\n=== result ===")
@@ -417,3 +426,112 @@ func _percentile(values: Array[float], fraction: float) -> float:
 	sorted.sort()
 	var index: int = clampi(roundi(fraction * float(sorted.size() - 1)), 0, sorted.size() - 1)
 	return sorted[index]
+
+
+## Orbiting the camera, and the contract that survives it.
+##
+## The rig can be spun a full turn around the player with a left-click drag,
+## and movement is camera-relative — so the thing that can silently break is
+## not the rotation itself but the handoff: `yaw_changed` reaching the player,
+## and "forward" continuing to mean "away from the camera" at every bearing.
+## A wrong sign here looks fine standing still and sends you backwards the
+## moment you turn around, which is exactly the sort of bug a screenshot of a
+## rotated camera would happily hide.
+func _orbit(level: Node) -> void:
+	var rig: CameraRig = level.find_child("CameraRig", true, false) as CameraRig
+	var camera: Camera3D = rig.find_child("Camera3D", true, false) as Camera3D
+	if rig == null or camera == null:
+		_failures.append("orbit: no camera rig in the level")
+		return
+
+	print("=== orbit ===")
+	# A drag of `pixels` at the rig's own sensitivity must produce exactly the
+	# yaw that implies — this is also the check that the value is applied once
+	# per tick rather than once per motion event.
+	var pixels: float = 720.0
+	var expected: float = pixels * rig.orbit_sensitivity
+	var before: float = rig.yaw_degrees
+	await _drag(pixels)
+	var turned: float = absf(angle_difference(
+		deg_to_rad(before), deg_to_rad(rig.yaw_degrees)
+	))
+	print("%.0f px of drag turned the view %.1f deg (expected %.1f)"
+		% [pixels, rad_to_deg(turned), expected])
+	if absf(rad_to_deg(turned) - expected) > 1.0:
+		_failures.append(
+			"orbit: %.0f px turned %.1f deg, expected %.1f"
+			% [pixels, rad_to_deg(turned), expected]
+		)
+
+	# Walk at four bearings around the circle. At each one, forward must be
+	# away from the camera and the player must actually cover ground.
+	for quarter: int in range(4):
+		rig.set_yaw_degrees(fposmod(90.0 * quarter, 360.0))
+		_player.global_position = START
+		_player.velocity = Vector3.ZERO
+		rig.snap_to_target()
+		for _i: int in range(30):
+			await physics_frame
+
+		var to_camera: Vector3 = camera.global_position - _player.global_position
+		to_camera.y = 0.0
+		var away: Vector3 = -to_camera.normalized()
+		var from: Vector3 = _player.global_position
+
+		Input.action_press("move_up")
+		for _i: int in range(70):
+			await physics_frame
+		Input.action_release("move_up")
+		for _i: int in range(10):
+			await physics_frame
+
+		var moved: Vector3 = _player.global_position - from
+		moved.y = 0.0
+		var alignment: float = moved.normalized().dot(away) if moved.length() > 0.01 else 0.0
+		print("  yaw %3.0f deg: walked %.2f m, forward-vs-away %.3f"
+			% [rig.yaw_degrees, moved.length(), alignment])
+		if moved.length() < 0.5:
+			_failures.append(
+				"orbit: at yaw %.0f the player barely moved (%.2f m)"
+				% [rig.yaw_degrees, moved.length()]
+			)
+		if alignment < 0.99:
+			_failures.append(
+				"orbit: at yaw %.0f 'forward' is %.3f aligned with away-from-camera"
+				% [rig.yaw_degrees, alignment]
+			)
+
+	# The pitch is deliberately fixed — this is a turntable, not free-look, and
+	# a stray vertical term would tilt the diorama framing out of the art
+	# direction the whole look rests on.
+	var pitch_before: float = rig.pitch_degrees
+	await _drag(400.0, 260.0)
+	if not is_equal_approx(rig.pitch_degrees, pitch_before):
+		_failures.append(
+			"orbit: vertical drag changed the pitch %.1f -> %.1f; it must stay fixed"
+			% [pitch_before, rig.pitch_degrees]
+		)
+	else:
+		print("vertical drag left the pitch at %.1f deg" % rig.pitch_degrees)
+
+
+## Presses the orbit button, feeds mouse motion, releases.
+func _drag(dx: float, dy: float = 0.0) -> void:
+	var press: InputEventMouseButton = InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	Input.parse_input_event(press)
+	await physics_frame
+
+	var steps: int = 24
+	for _i: int in range(steps):
+		var motion: InputEventMouseMotion = InputEventMouseMotion.new()
+		motion.relative = Vector2(dx / steps, dy / steps)
+		Input.parse_input_event(motion)
+		await physics_frame
+
+	var release: InputEventMouseButton = InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	release.pressed = false
+	Input.parse_input_event(release)
+	await physics_frame

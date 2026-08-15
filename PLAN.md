@@ -35,7 +35,7 @@ Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `devel
 ## Fixed decisions (do not re-litigate in later sessions)
 
 - **Engine:** Godot 4.7.1, Forward+ renderer. Repo root **is** the Godot project root.
-- **Camera:** angled perspective camera, narrow FOV (~35°) for the "toy diorama" feel, pitched **19°** down since Phase 4 — low enough that dune backs and a sliver of hazy horizon sit in the upper frame (Joshua compared a 45–16° ladder and picked 19; history: 52° → 45° → 19°, see DECISIONS.md). Keeps a small vertical clearance above terrain; rotatable in 45° steps later if wanted; never free-look.
+- **Camera:** angled perspective camera, narrow FOV (~35°) for the "toy diorama" feel, pitched **19°** down since Phase 4 — low enough that dune backs and a sliver of hazy horizon sit in the upper frame (Joshua compared a 45–16° ladder and picked 19; history: 52° → 45° → 19°, see DECISIONS.md). Keeps a small vertical clearance above terrain. **Freely orbits 360° around the player on a left-click drag** (Joshua's call, 2026-08-14 — supersedes the earlier "45° steps if wanted"). **The pitch stays fixed**: this is a turntable, not free-look, so the diorama framing can never be lost.
 - **Art:** low-poly flat-shaded, palette-only materials (see `docs/ART_DIRECTION.md`). Blender sources in `assets/blender/`, exported `.glb` in `assets/models/`.
 - **World:** chunked terrain streamed around the player (see `docs/ARCHITECTURE.md`). Deterministic generation from a world seed.
 - **Code:** GDScript (typed), feature-folder organization, conventions in CLAUDE.md. No C# unless a profiled performance need forces it (record it in `docs/DECISIONS.md` if so).
