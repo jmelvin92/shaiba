@@ -61,7 +61,7 @@ PREVIEW_DIR = os.path.join(PROJECT, "docs", "references")
 DEFAULT_WALL = "clay"
 WALL = "clay"          # adobe mass: walls, parapet, stair (--wall <palette name>)
 TRIM = "wood"          # vigas, window frames, sills, door jambs
-DECK = "sand_shadow"   # roof surface and interior floor: packed earth
+DECK = "sand_shadow"   # the roof terrace, which really is dust over the slab
 GLASS = "night_blue"   # window recesses, read as shadow rather than glazing
 CLOTH = "plaster"      # the awning
 
@@ -271,8 +271,15 @@ def vigas(part: Part, axis: str, face: float, span: tuple[float, float],
 # --- the building ------------------------------------------------------------
 
 def build_ground_floor(materials: dict) -> bpy.types.Object:
+    """The ground storey's floor slab.
+
+    Laid in WALL, the same tone as the slab overhead, so both storeys read as
+    one building and a wall-tone change carries the floors with it. In
+    `sand_shadow` this was a sand tone indoors — you walked through the door
+    and still appeared to be standing on the desert.
+    """
     part = Part("ground_floor")
-    part.box((-HALF_X, -HALF_Y, -FOUNDATION), (HALF_X, HALF_Y, 0.0), DECK)
+    part.box((-HALF_X, -HALF_Y, -FOUNDATION), (HALF_X, HALF_Y, 0.0), WALL)
     return part.emit(materials)
 
 
