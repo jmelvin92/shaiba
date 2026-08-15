@@ -24,6 +24,11 @@ Run sets (`*_run`) are **optional**: a surface without one automatically
 reuses its walk takes at run loudness. Sourcing a real run set for a surface
 overrides the fallback the moment its files land.
 
+A surface can instead use a **continuous movement track**: drop a single
+`<surface>_loop.wav` (or `.ogg`) — e.g. `sand_loop.wav` — and it plays while
+moving on that surface (louder and slightly faster at a run), replacing
+per-step one-shots entirely. Sand works this way as of 2026-08-15.
+
 | Files | What it should sound like |
 |---|---|
 | `sand_walk_01..04+.wav` | Soft, deep dry sand underfoot — muffled crunch |
