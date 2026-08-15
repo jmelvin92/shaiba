@@ -16,10 +16,14 @@ background_mode = 2
 sky = SubResource("Sky_sky")
 tonemap_mode = 2
 fog_enabled = true
+fog_mode = 1
 fog_light_color = Color(1, 0.937255, 0.839216, 1)
-fog_density = 0.004
+fog_density = 1.0
 fog_aerial_perspective = 0.5
 fog_sky_affect = 0.0
+fog_depth_curve = 1.4
+fog_depth_begin = 100.0
+fog_depth_end = 330.0
 
 [node name="DesertEnvironment" type="Node3D"]
 script = ExtResource("1_denv")

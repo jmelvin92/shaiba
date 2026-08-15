@@ -70,8 +70,29 @@ func _make_environment() -> DesertEnvironment:
 func _run() -> void:
 	await process_frame
 	_golden_hour_reproduction()
+	_fog_shape()
 	_full_day_sweep()
 	_darkness_rungs()
+
+
+## The haze is distance-only depth fog (Joshua's ladder pick, 2026-08-15) and
+## must fully melt terrain before the ~350 m streaming edge at every hour —
+## density 1.0 at depth_end < 350 guarantees it by construction, so the shape
+## itself is the contract.
+func _fog_shape() -> void:
+	var env: DesertEnvironment = _make_environment()
+	var environment: Environment = _environment_of(env)
+	_check(environment.fog_enabled, "fog is disabled")
+	_check(environment.fog_mode == Environment.FOG_MODE_DEPTH,
+		"fog_mode is %d, wanted depth" % environment.fog_mode)
+	_check(is_equal_approx(environment.fog_density, 1.0),
+		"depth-fog density %.2f — under 1.0 the streaming edge shows through" % environment.fog_density)
+	_check(environment.fog_depth_end <= 350.0,
+		"fog_depth_end %.0f m reaches past the streaming edge" % environment.fog_depth_end)
+	_check(environment.fog_depth_begin < environment.fog_depth_end,
+		"fog_depth_begin %.0f m is not before end %.0f m" % [
+			environment.fog_depth_begin, environment.fog_depth_end])
+	env.free()
 
 
 ## Standalone (no Game): the scene must hold the committed 16:00 light.

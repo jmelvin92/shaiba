@@ -27,6 +27,7 @@ These are the **only** colors in the game. Each has a matching flat-shaded `Stan
 - **Dawn (05:00–06:30) / dusk (17:30–19:30):** sun warms through `#FFDCA8`/`#FFCE96` to the horizon glows `#FFB36B` (dawn) and `#FF9E63` (dusk); horizon sky passes through `#E8A06A` / `#F0975C`.
 - **Night (properly dark — Joshua's ladder pick, 2026-08-15):** sky `#101828` overhead, `#1F2B44` at the horizon (both are `night_blue` territory); a faint cool moon light `#BFD2E8` at energy 0.06. Night is *meant* to be dark: carried light (torches, the oil lamp) is useful, and a touch of dread is intended. `night_darkness` on `DesertEnvironment` blends back toward a bright-moonlit look if this ever needs revisiting.
 - Ambient always follows the sky (the Environment's ambient source), and fog color always equals the sky horizon color — at every hour, so the far dunes melt into haze by night exactly as by day.
+- **The haze is distance-only** (Joshua's ladder pick, 2026-08-15): depth fog, crystal clear to 100 m, full melt by 330 m — inside the ~350 m streaming edge. The playable frame carries no fog wash at all; the haze exists solely to dissolve the horizon. `verify_cycle` asserts the shape.
 - Shadows soft-edged, never pure black (lift toward `night_blue`).
 
 Rule of thumb for cohesion: **large areas = sand tones; buildings = plaster/clay/wood; green and teal are scarce and precious; gold marks things you can interact with.**
