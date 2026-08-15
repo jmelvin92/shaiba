@@ -245,7 +245,7 @@ Loose ends worth knowing about, none blocking:
 
 ### Part 2 — Camel & the missing player clips
 
-Blocked on Joshua generating in Meshy: a rigged **camel** (`idle` + `walk`) and the **player clips** Phase 3 left missing (forward crouch-walk, a real fall, a landing).
+Blocked on Joshua generating in Meshy: a rigged **camel** (`idle` + `walk`) and the **player clips** Phase 3 left missing (forward crouch-walk, a real fall, a landing). *(Added 2026-08-15 from the Phase 6.5 torch work: a **torch-carry clip** — or idle/walk variants with the right arm raised holding something — so the carried torch stops riding a hanging-arm pose; the grip transform is tuned as far as geometry can take it.)*
 
 **Deliverables**
 - **Camel** conditioned by `tools/build_camel.py` per the imported-asset audit (facing, emission/material fixes, texture downscale, `measure_gaits` stride numbers, root-motion check), ≤ 3,000 tris target.

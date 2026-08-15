@@ -13,10 +13,12 @@ var _rest_transform: Transform3D = Transform3D(
 	Basis.IDENTITY.rotated(Vector3.RIGHT, -0.26), Vector3(0.0, 1.12, -0.055))
 ## How the grip sits in the hand. The rig's hand bone points its +Y down the
 ## fingers — straight at the ground while the arm hangs — so the torch is
-## flipped nearly 180° to burn upward, with a small outward cant. Tuned
-## against screenshots (the first attempt lit the player's ankles).
+## flipped nearly 180° to burn upward, then canted the other way so the head
+## leans *forward* past the shoulder. Tuned against screenshots twice: the
+## first attempt lit the player's ankles, the second leaned backward.
 var _carry_transform: Transform3D = Transform3D(
-	Basis.IDENTITY.rotated(Vector3.RIGHT, PI - 0.30), Vector3(0.0, -0.06, 0.05))
+	Basis.IDENTITY.rotated(Vector3.RIGHT, PI + 0.40).rotated(Vector3.BACK, 0.45),
+	Vector3(0.0, -0.06, 0.10))
 
 @onready var _torch: Torch = $Torch
 @onready var _interactable: Interactable = $Interactable

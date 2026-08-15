@@ -52,6 +52,15 @@ const LAYER_FADEABLE: int = 5
 @export var cutaway_path: NodePath = ^"Cutaway"
 ## Interior volumes that report an occupant to the cutaway.
 @export var interior_areas: Array[NodePath] = [^"Cutaway/Interior"]
+## The ground-floor lamp, and the soft "spill" lights just outside the
+## ground-floor windows that follow it. Real lamplight does pass through the
+## open windows, but a table-height lamp can only throw it *upward* through a
+## 1 m sill — physically honest and visually mute from the courtyard. The
+## spill lights paint the wall face and the sand under each lit window, which
+## is the glow a distant camera actually reads (Joshua asked for more glow,
+## 2026-08-15).
+@export var lamp_path: NodePath = ^"Furnishings/Ground/OilLamp"
+@export var window_spill_path: NodePath = ^"WindowSpill"
 
 
 func _ready() -> void:
@@ -86,6 +95,12 @@ func _ready() -> void:
 		var door: Door = get_node_or_null(path) as Door
 		if door != null and not door.fadeable:
 			managed.append_array(door.get_visuals())
+
+	var lamp: OilLamp = get_node_or_null(lamp_path) as OilLamp
+	var spill: Node3D = get_node_or_null(window_spill_path) as Node3D
+	if lamp != null and spill != null:
+		lamp.lit_changed.connect(func(lit: bool) -> void: spill.visible = lit)
+		spill.visible = lamp.lit
 
 	var cutaway: InteriorCutaway = get_node_or_null(cutaway_path) as InteriorCutaway
 	if cutaway == null:

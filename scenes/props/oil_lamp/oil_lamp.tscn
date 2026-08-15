@@ -16,6 +16,8 @@ script = ExtResource("1_lamp")
 [node name="Flame" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.21, 0)
 script = ExtResource("3_flame")
+light_range = 10.0
+base_energy = 2.4
 
 [node name="Interactable" type="Area3D" parent="."]
 collision_layer = 8

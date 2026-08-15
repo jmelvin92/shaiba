@@ -83,6 +83,15 @@ func _run() -> void:
 		float(frames) / total_s, worst_ms])
 	await _shoot("torch_walk")
 
+	# Side view of the carried torch, minimum zoom, for judging the grip.
+	rig.set_yaw_degrees(90.0)
+	rig._zoom_goal = 9.0
+	rig._zoom_current = 9.0
+	rig.snap_to_target()
+	await _shoot("torch_grip_side")
+	rig._zoom_goal = 23.0
+	rig._zoom_current = 23.0
+
 	# The racked torch at dusk, stand and door in one frame.
 	stand._on_interacted(player)
 	rig.set_yaw_degrees(180.0)
