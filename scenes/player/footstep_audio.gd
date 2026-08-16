@@ -33,10 +33,10 @@ signal noise_made(world_position: Vector3, loudness: float)
 ## "very harsh", then "much quieter... adjusting relativity") — steps are the
 ## quietest layer of the mix, felt more than heard, under doors, fire and
 ## interaction sounds.
-@export_range(-60.0, 6.0, 0.5) var walk_volume_db: float = -46.0
+@export_range(-60.0, 6.0, 0.5) var walk_volume_db: float = -27.0
 ## Loudness of a running step. Same samples as walking, a bit louder —
 ## Joshua's design: feet keep their voices at any speed.
-@export_range(-60.0, 6.0, 0.5) var run_volume_db: float = -42.0
+@export_range(-60.0, 6.0, 0.5) var run_volume_db: float = -23.0
 ## Loudness of the crouch shuffle loop — sneaking should be genuinely quiet.
 @export_range(-60.0, 0.0, 0.5) var shuffle_volume_db: float = -18.0
 
