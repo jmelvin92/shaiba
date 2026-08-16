@@ -22,9 +22,9 @@ const GameClock := preload("res://autoload/game.gd")
 @export var beds_muted: bool = false
 ## Full-day loudness of the daytime wind bed, when not muted. Very quiet by
 ## his direction: "a background subtle element".
-@export_range(-40.0, 6.0, 0.5) var day_volume_db: float = -26.0
+@export_range(-40.0, 6.0, 0.5) var day_volume_db: float = -22.0
 ## Full-night loudness of the night bed.
-@export_range(-40.0, 6.0, 0.5) var night_volume_db: float = -26.0
+@export_range(-40.0, 6.0, 0.5) var night_volume_db: float = -22.0
 
 @export_group("Gusts")
 ## Loudness of a gust one-shot at its source.
