@@ -12,6 +12,9 @@ export/
 # macOS
 .DS_Store
 
+# Python bytecode (tools/)
+__pycache__/
+
 # Misc
 *.tmp
 *.log
