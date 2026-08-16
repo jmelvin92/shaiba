@@ -77,6 +77,12 @@ exist. Sand works this way.
 | `wind_night_loop.ogg` | Night desert — sparser, colder, slightly unsettling, seamless loop |
 | `gust_01..04.wav` | Individual wind gusts that can sweep past, mono, ~3–8 s |
 
+## music/
+
+| Files | What it should sound like |
+|---|---|
+| `ambient_01..NN.ogg` | Quiet instrumental beds, seamless loops. `ambient_01` loops solo for now; when more land, they become a random rotation with silent gaps between tracks. |
+
 ## Later (do NOT source yet — listed so the plan stays in one place)
 
 Camel (grunts, steps, chewing) · sand-slide on steep dunes · night creature ·
