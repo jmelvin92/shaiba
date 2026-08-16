@@ -5,8 +5,9 @@ extends SceneTree
 ##
 ## Asserts the audio system's structure and logic with ZERO sound files
 ## present — silent-safe is part of the gate. What it checks:
-##   1. Bus layout: Music/Ambience/SFX/Interior exist, Interior sends to SFX
-##      and carries reverb, Ambience carries the muffle low-pass.
+##   1. Bus layout: Music/Sound/Ambience/SFX/Interior exist, Interior sends
+##      to SFX, Ambience and SFX send to Sound (the settings slider's bus),
+##      Interior carries reverb, Ambience carries the muffle low-pass.
 ##   2. Listener: rides at the player's position, turns with the camera yaw.
 ##   3. Footsteps: surface resolution answers "packed" on the courtyard pad,
 ##      "sand" on a deep drift, "stone" on the house ground floor, "wood" on
@@ -123,12 +124,20 @@ func _wait(frames: int) -> void:
 
 func _check_buses() -> void:
 	print("buses:")
-	_check("5 buses loaded from default_bus_layout.tres", AudioServer.bus_count == 5)
-	for wanted: StringName in [&"Music", &"Ambience", &"SFX", &"Interior"]:
+	_check("6 buses loaded from default_bus_layout.tres", AudioServer.bus_count == 6)
+	for wanted: StringName in [&"Music", &"Sound", &"Ambience", &"SFX", &"Interior"]:
 		_check("bus '%s' exists" % wanted, AudioServer.get_bus_index(wanted) >= 0)
 	var interior: int = AudioServer.get_bus_index(&"Interior")
 	_check(
 		"Interior sends to SFX", AudioServer.get_bus_send(interior) == &"SFX"
+	)
+	_check(
+		"Ambience sends to Sound (the settings slider's bus)",
+		AudioServer.get_bus_send(AudioServer.get_bus_index(&"Ambience")) == &"Sound"
+	)
+	_check(
+		"SFX sends to Sound (the settings slider's bus)",
+		AudioServer.get_bus_send(AudioServer.get_bus_index(&"SFX")) == &"Sound"
 	)
 	_check(
 		"Interior carries reverb",

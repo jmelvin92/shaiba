@@ -10,6 +10,9 @@ extends Node
 ## state (his words: "one of many ambient songs that will trigger randomly")
 ## is a rotation: random track, a silent gap, another track. Build that here
 ## when a second track lands; nothing else in the game will need to change.
+##
+## The scene runs with PROCESS_MODE_ALWAYS: music keeps playing under the
+## pause menu, which also makes the menu's Music slider audible live.
 
 ## Loudness of the music. Sits below the wind bed by design — music is the
 ## deepest layer of the mix. Sliders will later ride the Music bus instead.

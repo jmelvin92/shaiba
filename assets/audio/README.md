@@ -77,6 +77,13 @@ exist. Sand works this way.
 | `wind_night_loop.ogg` | Night desert — sparser, colder, slightly unsettling, seamless loop |
 | `gust_01..04.wav` | Individual wind gusts that can sweep past, mono, ~3–8 s |
 
+## ui/ — menu feedback (sourced 2026-08-15)
+
+| Files | What it should sound like |
+|---|---|
+| `hover_01..NN.wav` | Soft tick when the pointer crosses a menu control |
+| `click_01..NN.wav` | Confirming tap when a control is pressed |
+
 ## music/
 
 | Files | What it should sound like |

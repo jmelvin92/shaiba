@@ -18,7 +18,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 5 | Sand footprint physics | `feature/phase-5-footprints` | ✅ Done (2026-08-14) |
 | 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🟡 In progress — Part 1 + door/interaction system done (awaiting look review), Part 2 needs Meshy assets |
 | 6.5 | Game clock, day-night cycle & lighting (side-track) | `feature/daynight-lighting` | 🟡 In progress — clock ✅; cycle ✅; lighting built & verified 2026-08-15 (lamp, torch, flames, real windows), awaiting flicker playtest |
-| 6.6 | Audio system (side-track) | `feature/audio-system` | 🟡 Engine done; first sound batch in & mix approved by ear 2026-08-15 (sand steps, doors, wind, music). Remaining: fire/landing/shuffle/indoor sounds, then final listen-through |
+| 6.6 | Audio system (side-track) | `feature/audio-system` | 🟡 Engine done; first sound batch in & mix approved by ear 2026-08-15 (sand steps, doors, wind, music); pause menu (Esc) + settings audio sliders + UI sounds in 2026-08-15. Remaining: fire/landing/shuffle/indoor sounds, then final listen-through |
 | 7 | Integration & polish → v0.1 | `feature/phase-7-polish` | 🔲 Not started |
 
 Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `development` · ✅ Done (merged, gate passed)
@@ -377,6 +377,7 @@ The engine is stable and the tuning loop with Joshua converged. What the next se
 - **Workflow**: he pastes file paths + a word of intent; `tools/prepare_sounds.py` conditions everything (slice/trim/normalize/loop-seam); relaunch the game after every change (`pkill` the old instance first). Volume verdicts come fast and by ear — implement literally, relaunch, ask nothing.
 - **Sourcing still open** (the ever-growing list lives in `assets/audio/README.md`): fire group, jump/landings, crouch shuffle, indoor floor replacement, packed earth, night bed, gusts, more music.
 - Sliders later attach to the buses (Master/Music/Ambience/SFX) — mix-level tuning already lives there (SFX −6), per-sound tuning in exports.
+- **Pause menu detour (2026-08-15, Joshua's request):** Esc pauses and opens a palette-styled menu (Resume / Settings → Audio) with Music and Sound sliders, persisted to `user://settings.cfg`. The bus layout gained a parent `Sound` bus over Ambience + SFX so the slider never fights the AcousticZone's ducking — mix baselines untouched. Hover/click UI sounds sourced by Joshua live in `assets/audio/ui/`; music keeps playing under the menu. Gate: `tools/verify_pause.gd` (all pass, plus `verify_audio` re-run green on the new layout). See DECISIONS.
 
 ## Phase 7 — Integration & polish → v0.1
 
