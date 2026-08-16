@@ -1,3 +1,4 @@
+@static_unload
 class_name SoundBank
 extends RefCounted
 ## The one place that knows how sound files are named (Phase 6.6).
