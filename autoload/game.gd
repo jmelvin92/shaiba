@@ -63,6 +63,10 @@ func _init() -> void:
 	period = period_at(time_of_day)
 
 
+func _ready() -> void:
+	add_to_group(SaveSystem.GROUP)
+
+
 func _process(delta: float) -> void:
 	if Input.is_action_pressed(&"debug_time_forward"):
 		advance_hours(delta * debug_scrub_speed)
@@ -138,3 +142,26 @@ func _refresh_period() -> void:
 	if now != period:
 		period = now
 		period_changed.emit(now)
+
+
+## --- Persistence (the SaveSystem contract) ---------------------------------
+
+
+func get_persistence_key() -> String:
+	return "game_clock"
+
+
+func capture_state() -> Dictionary:
+	return {
+		"time_of_day": time_of_day,
+		"day_count": day_count,
+		"world_seed": world_seed,
+	}
+
+
+func restore_state(state: Dictionary, _context: Dictionary) -> void:
+	set_time_of_day(float(state.get("time_of_day", start_hour)))
+	day_count = int(state.get("day_count", 0))
+	# Terrain already built from the launch seed this session; restoring the
+	# seed matters the day loading happens before world build (a main menu).
+	world_seed = int(state.get("world_seed", world_seed))

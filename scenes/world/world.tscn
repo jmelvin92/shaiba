@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scenes/world/level_root.gd" id="1_level"]
 [ext_resource type="PackedScene" path="res://scenes/world/desert_environment.tscn" id="2_env"]
@@ -12,6 +12,7 @@
 [ext_resource type="PackedScene" path="res://scenes/audio/ambience.tscn" id="10_ambience"]
 [ext_resource type="PackedScene" path="res://scenes/audio/music.tscn" id="11_music"]
 [ext_resource type="PackedScene" path="res://scenes/ui/pause_menu/pause_menu.tscn" id="12_pause"]
+[ext_resource type="Script" path="res://scenes/world/save_system.gd" id="13_save"]
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_level")
@@ -40,3 +41,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
 [node name="Music" parent="." instance=ExtResource("11_music")]
 
 [node name="PauseMenu" parent="." instance=ExtResource("12_pause")]
+
+[node name="SaveSystem" type="Node" parent="."]
+script = ExtResource("13_save")

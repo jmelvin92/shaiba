@@ -23,7 +23,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 
 Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `development` · ✅ Done (merged, gate passed)
 
-**Later (out of scope for now):** survival systems (hunger/thirst/heat), inventory, NPCs/dialogue, save games, sound design. Do not build these early "while we're in there" — but do leave clean extension points. *(The day-night cycle was on this list; Joshua pulled it forward on 2026-08-14 — see Phase 6.5.)*
+**Later (out of scope for now):** survival systems (hunger/thirst/heat), inventory, NPCs/dialogue, save games, sound design. Do not build these early "while we're in there" — but do leave clean extension points. *(The day-night cycle was on this list; Joshua pulled it forward on 2026-08-14 — see Phase 6.5. Save games likewise, 2026-08-15 — see the Phase 6.6 detour notes.)*
 
 ---
 
@@ -378,6 +378,7 @@ The engine is stable and the tuning loop with Joshua converged. What the next se
 - **Sourcing still open** (the ever-growing list lives in `assets/audio/README.md`): fire group, jump/landings, crouch shuffle, indoor floor replacement, packed earth, night bed, gusts, more music.
 - Sliders later attach to the buses (Master/Music/Ambience/SFX) — mix-level tuning already lives there (SFX −6), per-sound tuning in exports.
 - **Pause menu detour (2026-08-15, Joshua's request):** Esc pauses and opens a palette-styled menu (Resume / Settings → Audio) with Music and Sound sliders, persisted to `user://settings.cfg`. The bus layout gained a parent `Sound` bus over Ambience + SFX so the slider never fights the AcousticZone's ducking — mix baselines untouched. Hover/click UI sounds sourced by Joshua live in `assets/audio/ui/`; music keeps playing under the menu. Gate: `tools/verify_pause.gd` (all pass, plus `verify_audio` re-run green on the new layout). See DECISIONS.
+- **Save/load detour (2026-08-15, Joshua's request, same session):** Save Game / Load Game in the pause menu, one slot (`user://saves/save_01.json`). Built as the persistence contract Joshua asked to future-proof — stable keys, group-walked, unknown keys warn-and-skip (ARCHITECTURE → Persistence). Saves today: clock+seed, player, camera, both doors, lamp, carried torch; footprints deliberately ephemeral. Gate: `tools/verify_save.gd` all pass; full battery re-run green (pause, audio, clock, house, lighting, cycle, player). This removes save/load from the "later" list.
 
 ## Phase 7 — Integration & polish → v0.1
 

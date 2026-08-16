@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://scenes/ui/pause_menu/pause_menu.gd" id="1_script"]
 
@@ -55,6 +55,17 @@ border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
 border_color = Color(0.886275, 0.662745, 0.231373, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_disabled"]
+content_margin_left = 20.0
+content_margin_top = 11.0
+content_margin_right = 20.0
+content_margin_bottom = 11.0
+bg_color = Color(0.203922, 0.270588, 0.368627, 0.55)
 corner_radius_top_left = 5
 corner_radius_top_right = 5
 corner_radius_bottom_right = 5
@@ -200,6 +211,37 @@ theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
 theme_override_styles/focus = SubResource("StyleBoxFlat_btn_focus")
 text = "Resume"
+
+[node name="SaveButton" type="Button" parent="Center/Panel/Margin/Pages/RootPage"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.949, 0.906, 0.812, 1)
+theme_override_colors/font_hover_color = Color(0.949, 0.906, 0.812, 1)
+theme_override_colors/font_pressed_color = Color(0.949, 0.906, 0.812, 1)
+theme_override_colors/font_focus_color = Color(0.949, 0.906, 0.812, 1)
+theme_override_font_sizes/font_size = 19
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
+theme_override_styles/focus = SubResource("StyleBoxFlat_btn_focus")
+text = "Save Game"
+
+[node name="LoadButton" type="Button" parent="Center/Panel/Margin/Pages/RootPage"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+theme_override_colors/font_color = Color(0.949, 0.906, 0.812, 1)
+theme_override_colors/font_hover_color = Color(0.949, 0.906, 0.812, 1)
+theme_override_colors/font_pressed_color = Color(0.949, 0.906, 0.812, 1)
+theme_override_colors/font_focus_color = Color(0.949, 0.906, 0.812, 1)
+theme_override_colors/font_disabled_color = Color(0.949, 0.906, 0.812, 0.55)
+theme_override_font_sizes/font_size = 19
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
+theme_override_styles/focus = SubResource("StyleBoxFlat_btn_focus")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_btn_disabled")
+text = "Load Game"
 
 [node name="SettingsButton" type="Button" parent="Center/Panel/Margin/Pages/RootPage"]
 unique_name_in_owner = true

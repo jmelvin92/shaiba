@@ -32,6 +32,10 @@ signal toggled(is_open: bool)
 ## the door to its wall; standalone, a door is simply fadeable.
 @export var fadeable: bool = true
 
+## Stable save-file ID. Doors are multi-instance, so each placed door should
+## set one ("front_door"); empty falls back to the node's tree path.
+@export var persistence_id: String = ""
+
 @export var leaf_path: NodePath = ^"Leaf"
 @export var body_path: NodePath = ^"Leaf/Body"
 @export var interactable_path: NodePath = ^"Interactable"
@@ -52,6 +56,7 @@ var _latch_pending: bool = false
 
 
 func _ready() -> void:
+	add_to_group(SaveSystem.GROUP)
 	_leaf = get_node_or_null(leaf_path) as Node3D
 	if _leaf == null:
 		push_warning("Door: no leaf at %s; nothing to swing." % leaf_path)
@@ -149,6 +154,24 @@ func _play(takes: AudioStreamRandomizer) -> void:
 	if _audio.stream != takes:
 		_audio.stream = takes
 	_audio.play()
+
+
+## --- Persistence (the SaveSystem contract) ---------------------------------
+
+
+func get_persistence_key() -> String:
+	return SaveSystem.key_for(self, persistence_id)
+
+
+func capture_state() -> Dictionary:
+	return {"open": _open}
+
+
+func restore_state(state: Dictionary, _context: Dictionary) -> void:
+	var open: bool = bool(state.get("open", false))
+	if open != _open:
+		# Instant: a loaded door is simply in its state, no swing, no sound.
+		set_open(open, true)
 
 
 func _collect_visuals(root: Node, into: Array[GeometryInstance3D]) -> void:

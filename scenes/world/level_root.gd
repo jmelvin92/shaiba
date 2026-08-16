@@ -29,6 +29,14 @@ extends Node3D
 ## Direct child playing the ambient sound bed, if this level has one. Told to
 ## centre its gusts on the player; a level without one skips it.
 @export var ambience_path: NodePath = ^"Ambience"
+## Direct child owning save/load, if this level has one (the graybox doesn't).
+@export var save_system_path: NodePath = ^"SaveSystem"
+## Direct child holding the pause menu, whose save/load requests the level
+## answers by calling down into the SaveSystem.
+@export var pause_menu_path: NodePath = ^"PauseMenu"
+
+var _save_system: SaveSystem = null
+var _pause_menu: PauseMenu = null
 
 
 func _ready() -> void:
@@ -45,6 +53,17 @@ func _ready() -> void:
 	var ambience: Ambience = get_node_or_null(ambience_path) as Ambience
 	if ambience != null:
 		ambience.set_focus(player)
+
+	_save_system = get_node_or_null(save_system_path) as SaveSystem
+	_pause_menu = get_node_or_null(pause_menu_path) as PauseMenu
+	if _save_system != null:
+		_save_system.setup(
+			player, get_node_or_null(chunk_manager_path) as ChunkManager
+		)
+		if _pause_menu != null:
+			_pause_menu.save_requested.connect(_on_save_requested)
+			_pause_menu.load_requested.connect(_on_load_requested)
+			_pause_menu.set_can_load(_save_system.has_save())
 
 	var chunk_manager: ChunkManager = get_node_or_null(chunk_manager_path) as ChunkManager
 	if chunk_manager == null:
@@ -99,3 +118,13 @@ func _place_homestead(terrain: TerrainSettings, player: Player) -> void:
 	# so a marker sitting at the homestead's own height can't leave them buried.
 	player.global_position.x = spawn.global_position.x
 	player.global_position.z = spawn.global_position.z
+
+
+func _on_save_requested() -> void:
+	var ok: bool = _save_system.save_game()
+	_pause_menu.report_save(ok)
+	_pause_menu.set_can_load(_save_system.has_save())
+
+
+func _on_load_requested() -> void:
+	_pause_menu.report_load(_save_system.load_game())

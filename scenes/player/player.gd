@@ -178,6 +178,7 @@ var _sink_offset: float = 0.0
 
 
 func _ready() -> void:
+	add_to_group(SaveSystem.GROUP)
 	# The floor snap is what lowers the body again after a step-up probe, so it
 	# has to reach at least as far as the tallest step we allow.
 	floor_snap_length = maxf(floor_snap_length, max_step_height + 0.05)
@@ -563,3 +564,28 @@ func _measure_step(direction: Vector3, motion: Vector3, full_radius: float) -> f
 		return -1.0
 
 	return max_step_height - tread.get_travel().length()
+
+
+## --- Persistence (the SaveSystem contract) ---------------------------------
+
+
+func get_persistence_key() -> String:
+	return "player"
+
+
+func capture_state() -> Dictionary:
+	# Motion state (velocity, crouch, airborne) is deliberately dropped: a
+	# load lands the player standing still, which is what loading means.
+	return {
+		"position": [global_position.x, global_position.y, global_position.z],
+		"yaw": rotation.y,
+	}
+
+
+func restore_state(state: Dictionary, _context: Dictionary) -> void:
+	var at: Array = state.get("position", []) as Array
+	if at.size() == 3:
+		global_position = Vector3(float(at[0]), float(at[1]), float(at[2]))
+	rotation.y = float(state.get("yaw", rotation.y))
+	velocity = Vector3.ZERO
+	reset_physics_interpolation()

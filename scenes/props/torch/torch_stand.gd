@@ -26,7 +26,12 @@ var _carry_transform: Transform3D = Transform3D(
 var _audio: AudioStreamPlayer3D = null
 
 
+## Stable save-file ID; empty falls back to the node's tree path.
+@export var persistence_id: String = "torch_stand"
+
+
 func _ready() -> void:
+	add_to_group(SaveSystem.GROUP)
 	_interactable.interacted.connect(_on_interacted)
 	_torch.transform = _rest_transform
 	_torch.lit = false
@@ -42,17 +47,25 @@ func _on_interacted(actor: Node3D) -> void:
 	if socket == null:
 		return
 	if _torch.get_parent() == self:
-		_torch.reparent(socket, false)
-		_torch.transform = _carry_transform
-		_torch.lit = true
-		_interactable.prompt = "Return torch"
+		_give_to(socket)
 		_play(SoundBank.stream("fire/torch_take.wav"))
 	elif _torch.get_parent() == socket:
-		_torch.reparent(self, false)
-		_torch.transform = _rest_transform
-		_torch.lit = false
-		_interactable.prompt = "Take torch"
+		_return_to_stand()
 		_play(SoundBank.stream("fire/torch_return.wav"))
+
+
+func _give_to(socket: HandSocket) -> void:
+	_torch.reparent(socket, false)
+	_torch.transform = _carry_transform
+	_torch.lit = true
+	_interactable.prompt = "Return torch"
+
+
+func _return_to_stand() -> void:
+	_torch.reparent(self, false)
+	_torch.transform = _rest_transform
+	_torch.lit = false
+	_interactable.prompt = "Take torch"
 
 
 func _play(stream: AudioStream) -> void:
@@ -61,3 +74,30 @@ func _play(stream: AudioStream) -> void:
 	if _audio.stream != stream:
 		_audio.stream = stream
 	_audio.play()
+
+
+## --- Persistence (the SaveSystem contract) ---------------------------------
+
+
+func get_persistence_key() -> String:
+	return SaveSystem.key_for(self, persistence_id)
+
+
+func capture_state() -> Dictionary:
+	return {"taken": _torch.get_parent() != self}
+
+
+func restore_state(state: Dictionary, context: Dictionary) -> void:
+	var taken: bool = bool(state.get("taken", false))
+	if taken == (_torch.get_parent() != self):
+		return
+	if not taken:
+		_return_to_stand()
+		return
+	# "Carried" needs the carrier — the context's actor (the player).
+	var actor: Node3D = context.get("actor") as Node3D
+	if actor == null:
+		return
+	var socket: HandSocket = actor.find_child("HandSocket", true, false) as HandSocket
+	if socket != null:
+		_give_to(socket)

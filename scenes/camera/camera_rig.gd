@@ -109,6 +109,7 @@ var _pending_yaw: float = 0.0
 
 
 func _ready() -> void:
+	add_to_group(SaveSystem.GROUP)
 	_zoom_goal = clampf(zoom_distance, zoom_min, zoom_max)
 	_zoom_current = _zoom_goal
 	_camera.position.z = _zoom_current
@@ -256,3 +257,25 @@ func _apply_yaw() -> void:
 func _apply_pitch() -> void:
 	if _pitch_pivot != null:
 		_pitch_pivot.rotation.x = deg_to_rad(-pitch_degrees)
+
+
+## --- Persistence (the SaveSystem contract) ---------------------------------
+
+
+func get_persistence_key() -> String:
+	return "camera"
+
+
+func capture_state() -> Dictionary:
+	return {"yaw_degrees": yaw_degrees, "zoom_distance": zoom_distance}
+
+
+func restore_state(state: Dictionary, _context: Dictionary) -> void:
+	set_yaw_degrees(float(state.get("yaw_degrees", yaw_degrees)))
+	zoom_distance = clampf(
+		float(state.get("zoom_distance", zoom_distance)), zoom_min, zoom_max
+	)
+	_zoom_goal = zoom_distance
+	_zoom_current = zoom_distance
+	_camera.position.z = _zoom_current
+	snap_to_target()

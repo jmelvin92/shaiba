@@ -13,6 +13,12 @@ extends CanvasLayer
 ## (its own scene opts in), so the Music slider is audible live; everything
 ## else falls silent with the pause, which is the point of pausing.
 
+## The menu never saves or loads itself — it announces, and the level (which
+## owns the SaveSystem) answers back through report_save / report_load /
+## set_can_load. Keeps the UI ignorant of save-file mechanics.
+signal save_requested
+signal load_requested
+
 const SETTINGS_PATH: String = "user://settings.cfg"
 const MUSIC_BUS: StringName = &"Music"
 const SOUND_BUS: StringName = &"Sound"
@@ -24,6 +30,8 @@ const SOUND_BUS: StringName = &"Sound"
 @onready var _root_page: VBoxContainer = %RootPage
 @onready var _settings_page: VBoxContainer = %SettingsPage
 @onready var _resume_button: Button = %ResumeButton
+@onready var _save_button: Button = %SaveButton
+@onready var _load_button: Button = %LoadButton
 @onready var _settings_button: Button = %SettingsButton
 @onready var _back_button: Button = %BackButton
 @onready var _music_slider: HSlider = %MusicSlider
@@ -42,11 +50,15 @@ func _ready() -> void:
 	_click_sound.volume_db = click_volume_db
 
 	_resume_button.pressed.connect(_on_resume_pressed)
+	_save_button.pressed.connect(_on_save_pressed)
+	_load_button.pressed.connect(_on_load_pressed)
 	_settings_button.pressed.connect(_on_settings_pressed)
 	_back_button.pressed.connect(_on_back_pressed)
-	for button: Button in [_resume_button, _settings_button, _back_button]:
-		button.mouse_entered.connect(_play_hover)
-		button.focus_entered.connect(_play_hover)
+	for button: Button in [
+		_resume_button, _save_button, _load_button, _settings_button, _back_button
+	]:
+		button.mouse_entered.connect(_on_button_hover.bind(button))
+		button.focus_entered.connect(_on_button_hover.bind(button))
 		button.pressed.connect(_play_click)
 	for slider: HSlider in [_music_slider, _sound_slider]:
 		slider.mouse_entered.connect(_play_hover)
@@ -93,6 +105,40 @@ func _on_resume_pressed() -> void:
 	_close()
 
 
+func _on_save_pressed() -> void:
+	save_requested.emit()
+
+
+func _on_load_pressed() -> void:
+	load_requested.emit()
+
+
+## Called by the level: whether a save file exists for Load to act on.
+func set_can_load(can_load: bool) -> void:
+	_load_button.disabled = not can_load
+
+
+## Called by the level after a requested save; flashes the outcome in place.
+func report_save(ok: bool) -> void:
+	_flash_button(_save_button, "Saved" if ok else "Save failed", "Save Game")
+
+
+## Called by the level after a requested load. Success resumes play — the
+## loaded world is the point, not the menu.
+func report_load(ok: bool) -> void:
+	if ok:
+		_close()
+	else:
+		_flash_button(_load_button, "No save found", "Load Game")
+
+
+func _flash_button(button: Button, flash_text: String, rest_text: String) -> void:
+	button.text = flash_text
+	# create_timer defaults to process_always, so it ticks under the pause.
+	await get_tree().create_timer(1.1).timeout
+	button.text = rest_text
+
+
 func _on_settings_pressed() -> void:
 	_root_page.visible = false
 	_settings_page.visible = true
@@ -128,6 +174,11 @@ func _apply_bus_volume(bus: StringName, percent: float) -> void:
 	AudioServer.set_bus_volume_db(
 		index, maxf(linear_to_db(percent / 100.0), -80.0)
 	)
+
+
+func _on_button_hover(button: Button) -> void:
+	if not button.disabled:
+		_play_hover()
 
 
 func _play_hover() -> void:

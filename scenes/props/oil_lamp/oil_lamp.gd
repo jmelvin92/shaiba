@@ -21,7 +21,12 @@ signal lit_changed(lit: bool)
 var _audio: AudioStreamPlayer3D = null
 
 
+## Stable save-file ID; empty falls back to the node's tree path.
+@export var persistence_id: String = ""
+
+
 func _ready() -> void:
+	add_to_group(SaveSystem.GROUP)
 	_interactable.interacted.connect(_on_interacted)
 	_audio = AudioStreamPlayer3D.new()
 	_audio.bus = &"SFX"
@@ -45,3 +50,25 @@ func _on_interacted(_actor: Node3D) -> void:
 func _apply() -> void:
 	_flame.lit = lit
 	_interactable.prompt = "Snuff lamp" if lit else "Light lamp"
+
+
+## --- Persistence (the SaveSystem contract) ---------------------------------
+
+
+func get_persistence_key() -> String:
+	return SaveSystem.key_for(self, persistence_id)
+
+
+func capture_state() -> Dictionary:
+	return {"lit": lit}
+
+
+func restore_state(state: Dictionary, _context: Dictionary) -> void:
+	var value: bool = bool(state.get("lit", false))
+	if value == lit:
+		return
+	# The setter relights the flame; lit_changed still fires so listeners
+	# (the house's window spill lights) follow. Sound stays with the
+	# interaction — a restore is silent.
+	lit = value
+	lit_changed.emit(lit)
