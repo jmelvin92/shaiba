@@ -16,14 +16,15 @@ extends Node3D
 const GameClock := preload("res://autoload/game.gd")
 
 @export_group("Beds")
-## Kills both wind beds outright (Joshua, 2026-08-15 — "mute the wind
-## completely"). The loop files and the crossfade logic stay ready; the
-## future weather system flips this one export back off.
-@export var beds_muted: bool = true
-## Full-day loudness of the daytime wind bed, when not muted.
-@export_range(-40.0, 6.0, 0.5) var day_volume_db: float = -16.0
+## Kills both wind beds outright. Off again since Joshua supplied a wind he
+## likes (WindGusts, 2026-08-15) — kept as the future weather system's master
+## switch.
+@export var beds_muted: bool = false
+## Full-day loudness of the daytime wind bed, when not muted. Very quiet by
+## his direction: "a background subtle element".
+@export_range(-40.0, 6.0, 0.5) var day_volume_db: float = -26.0
 ## Full-night loudness of the night bed.
-@export_range(-40.0, 6.0, 0.5) var night_volume_db: float = -14.0
+@export_range(-40.0, 6.0, 0.5) var night_volume_db: float = -26.0
 
 @export_group("Gusts")
 ## Loudness of a gust one-shot at its source.
@@ -49,7 +50,12 @@ func _ready() -> void:
 	_game = get_node_or_null("/root/Game")
 	_rng.randomize()
 	_day = _make_bed(SoundBank.stream("ambience/wind_day_loop.ogg", true))
-	_night = _make_bed(SoundBank.stream("ambience/wind_night_loop.ogg", true))
+	var night_stream: AudioStream = SoundBank.stream("ambience/wind_night_loop.ogg", true)
+	if night_stream == null:
+		# One wind for now: until a dedicated night bed is sourced, the night
+		# keeps the same quiet wind instead of falling dead silent.
+		night_stream = SoundBank.stream("ambience/wind_day_loop.ogg", true)
+	_night = _make_bed(night_stream)
 	_gust = AudioStreamPlayer3D.new()
 	_gust.bus = &"Ambience"
 	_gust.max_distance = 60.0
