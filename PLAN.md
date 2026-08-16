@@ -18,7 +18,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 5 | Sand footprint physics | `feature/phase-5-footprints` | ✅ Done (2026-08-14) |
 | 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🟡 In progress — Part 1 + door/interaction system done (awaiting look review), Part 2 needs Meshy assets |
 | 6.5 | Game clock, day-night cycle & lighting (side-track) | `feature/daynight-lighting` | 🟡 In progress — clock ✅; cycle ✅; lighting built & verified 2026-08-15 (lamp, torch, flames, real windows), awaiting flicker playtest |
-| 6.6 | Audio system (side-track) | `feature/audio-system` | 🟡 Engine built & verified 2026-08-15 (silent-safe, full battery green); awaiting Joshua's sound files (`assets/audio/README.md`) + listen-through |
+| 6.6 | Audio system (side-track) | `feature/audio-system` | 🟡 Engine done; first sound batch in & mix approved by ear 2026-08-15 (sand steps, doors, wind, music). Remaining: fire/landing/shuffle/indoor sounds, then final listen-through |
 | 7 | Integration & polish → v0.1 | `feature/phase-7-polish` | 🔲 Not started |
 
 Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `development` · ✅ Done (merged, gate passed)
@@ -365,8 +365,18 @@ Deliverables and a quality gate are filled in **per piece at its planning sessio
 - [x] Footsteps: correct library chosen on deep sand / packed pad / stone floor / wood upper storey (surface switching asserted — courtyard resolves `packed` at its measured 0.25 m against the 0.35 m threshold, a 0.80 m drift resolves `sand`); loudness ordering run > walk asserted (−1 dB > −7 dB) with crouch making no step sound at all (shuffle loop instead); step events ride the stamper's plant edge via the new `foot_planted` signal, never a timer.
 - [x] Acoustic zone: entering the house closes the ambience low-pass (20500 → ~1080 Hz) and ducks the bus (−7.9 dB); leaving restores both (asserted). No cutaway fight — the zone is its own Area3D and touches only AudioServer state.
 - [x] Ambience crossfade anchored (noon/16:00 pure day, midnight pure night) and monotonic through dusk, driven only by the clock's own period constants.
-- [ ] With sourced sounds present (whenever Joshua's files land): a windowed listen-through — footsteps on all four surfaces, door, torch carry, lamp, day and night beds — and Joshua signs off on the feel. **← the open item; blocked on sound files.**
-- [x] Zero warnings (`--import`, per-script `--check-only`); world, graybox, player, house, ambience, torch stand, oil lamp and camera rig all run standalone clean; DECISIONS.md entry written (structure, listener placement, branch choice, no new autoload); merged to `development` after 6.5. *(Merge pending 6.5's flicker playtest.)*
+- [ ] With sourced sounds present (whenever Joshua's files land): a windowed listen-through — footsteps on all four surfaces, door, torch carry, lamp, day and night beds — and Joshua signs off on the feel. **← in progress.** *(2026-08-15, ~8 live tuning rounds with Joshua: sand footsteps (his own left/right recordings), doors, wind bed and the first music loop are in and the mix balance is his, approved by ear — "the relative between wind and footsteps are perfect". Still to source: fire group (torch/lamp loops + one-shots — matters most for the night-torch experience), jump/landings, crouch shuffle, indoor-floor replacement (current concrete disliked), packed-earth walk, dedicated night bed, gusts.)*
+- [x] Zero warnings (`--import`, per-script `--check-only`); world, graybox, player, house, ambience, torch stand, oil lamp and camera rig all run standalone clean; DECISIONS.md entry written (structure, listener placement, branch choice, no new autoload); merged to `development` after 6.5. *(Merge pending 6.5's flicker playtest. One accepted exception, in DECISIONS: an ogg bed playing at the instant of exit reports 4 leaked playback objects — bounded, same category as the Phase 6 house shutdown warning.)*
+
+**Handoff notes (2026-08-15, end of the sound-tuning session)**
+
+The engine is stable and the tuning loop with Joshua converged. What the next session inherits:
+
+- **How sounds work now** (all decided by Joshua across ~8 rounds, recorded in DECISIONS): footsteps are **deterministic per-foot samples** (`footsteps/<surface>_left/right.wav`) fired by the print system's plant events — no randomized variation sets (cross-library takes "too different"), no movement loops (tried, rejected). Runs reuse the walk samples louder. The mix hierarchy from quiet to loud is **footsteps → wind ≈ doors**, with **music below everything** (`music/ambient_NN.ogg`, first track loops; the plan is a random rotation with silent gaps once more tracks land).
+- **The tuning traps that cost rounds today**, so they aren't relearned: the plant detector chattered at low speeds until a per-foot **travel gate** (`min_step_distance`) was added to the stamper — Phase 5's prints hid duplicate stamps, audio exposed them; the **packed-vs-sand depth threshold silenced the entire homestead surround** (where Joshua always tests) for three rounds — it's now 0.05 m, and any future surface/zone logic must behave at the homestead first; wav loops need `loop_end` set from *duration* (importer compresses to QOA, so byte math lies).
+- **Workflow**: he pastes file paths + a word of intent; `tools/prepare_sounds.py` conditions everything (slice/trim/normalize/loop-seam); relaunch the game after every change (`pkill` the old instance first). Volume verdicts come fast and by ear — implement literally, relaunch, ask nothing.
+- **Sourcing still open** (the ever-growing list lives in `assets/audio/README.md`): fire group, jump/landings, crouch shuffle, indoor floor replacement, packed earth, night bed, gusts, more music.
+- Sliders later attach to the buses (Master/Music/Ambience/SFX) — mix-level tuning already lives there (SFX −6), per-sound tuning in exports.
 
 ## Phase 7 — Integration & polish → v0.1
 
