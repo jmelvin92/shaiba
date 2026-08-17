@@ -34,6 +34,8 @@ These are the **only** colors in the game. Each has a matching flat-shaded `Stan
 
 Rule of thumb for cohesion: **large areas = sand tones; buildings = plaster/clay/wood; green and teal are scarce and precious; gold marks things you can interact with.**
 
+**The ocean (Phase 6.7) is built entirely from this palette** — no new colors were needed: shallow water is `oasis_teal` (its designated "water" role, finally at scale), deep water saturates toward `night_blue`, foam is `plaster`, and wet sand is the color ramp driven to its `sand_shadow` end. The seabed shows pale sand through the shallows and fades dark with true depth. These are the shader defaults pending Joshua's water ladder (`tools/shoot_ocean.gd` renders the rungs); if a rung he picks steps off-palette, that color joins the table above first, per the standing rule. Teal stays scarce *on land* — the sea owning it is what keeps the oasis accent precious.
+
 ## Reference images
 
 `docs/references/` holds the visual references Joshua has supplied, committed so later sessions build against the same target rather than a remembered description. (`docs/` carries a `.gdignore` so Godot never imports them as game textures.)

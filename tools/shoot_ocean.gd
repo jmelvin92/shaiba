@@ -86,6 +86,29 @@ func _run() -> void:
 		)
 	_set_hour(16.0)
 
+	# Water-color ladder at the golden vantage: runtime-only patches to the
+	# sea material, one shot per rung; the committed scene is untouched. The
+	# picked rung's values get written into ocean_water.gdshader by hand (and,
+	# if off-palette, proposed as an ART_DIRECTION addition).
+	var ocean: Ocean = level.find_child("Ocean", true, false) as Ocean
+	var surface: MeshInstance3D = ocean.get_node(^"Surface") as MeshInstance3D
+	var water: ShaderMaterial = surface.mesh.surface_get_material(0) as ShaderMaterial
+	var rungs: Dictionary = {
+		"a_palette": [Color("5FA8A0"), Color("34455E")],
+		"b_lagoon": [Color("6FC2B4"), Color("2E5E7A")],
+		"c_deep_night": [Color("5FA8A0"), Color("1F2B44")],
+		"d_tropical": [Color("7CCFC0"), Color("27506B")],
+	}
+	for rung: String in rungs:
+		water.set_shader_parameter("shallow_color", (rungs[rung] as Array)[0])
+		water.set_shader_parameter("deep_color", (rungs[rung] as Array)[1])
+		await _stand_shot(
+			player, rig, terrain, Vector2(shore_x + 10.0, z), Vector2(-1, 0),
+			"ladder_%s" % rung
+		)
+	water.set_shader_parameter("shallow_color", (rungs["a_palette"] as Array)[0])
+	water.set_shader_parameter("deep_color", (rungs["a_palette"] as Array)[1])
+
 
 func _shore_x(terrain: TerrainSettings, z: float) -> float:
 	var lo: float = terrain.get_homestead_center().x - terrain.coast_distance - 40.0

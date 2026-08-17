@@ -125,6 +125,29 @@ Footprints can't be per-chunk geometry edits (too costly, breaks streaming). Ins
 
 `tools/verify_prints.gd` is the phase gate as an executable (run windowed): stamp↔bone alignment, off-trail cleanliness, landing splat, recentre survival, wind drift, decay-to-idle, pass cost.
 
+## Coast & ocean (as built in Phase 6.7)
+
+West of the desert the map becomes ocean. The whole biome is an extension of the analytic terrain model — no new world system, no second mesh pipeline:
+
+- **The coast lives in `TerrainSettings`**, framed relative to the homestead after the site is chosen: the mean waterline runs `coast_distance` (55 m, Joshua's 30-second-walk pick) west of the pad, wandering by seeded `coast_noise` into bays and headlands. Everything below is ordinary streamed terrain — the seabed has real mesh, real `HeightMapShape3D` collision, and real analytic queries all the way down (~24 m by 260 m out), because the future (swimming, diving, a submarine) must never have to retrofit it.
+- **Dunes shrink toward the sea on a bounded gradient**: a "ceiling" rising inland at `coast_slope_max_deg` presses the dune/mega stack down via a smooth-min, so no coast-manufactured slope can exceed the 31° budget and the far desert is **bit-identical** to a coastless world (`verify_ocean` proves it against a `coast_distance = 0` twin). The beach blends base ground onto a profile that crosses sea level exactly at the shoreline; a **dry-floor invariant** keeps every beach point past the swash a wave's amplitude above sea level, and `sea_level` (-3.8) sits below the deepest possible desert hollow — so the water plane can never flood anything inland.
+- **New queries** consumers key off: `has_coast()`, `get_sea_level()`, `get_shore_distance()` (signed, +inland, INF when coastless), `get_water_depth()`, `get_wetness()`, and `get_surface_tone()` — the last splitting the *visible* sand tint (pale dry beach, dark swash band, seabed fading pale→deep) from vertex `COLOR.a`, which keeps carrying true normalised depth for the print cap.
+- **The sea surface is `scenes/world/ocean/`**: one player-following plane at sea level whose vertices snap to a fixed world lattice, waves computed from world position (visual only — the analytic sea never moves). `shaders/ocean_water.gdshader` needs no terrain data at all: it reads the **depth buffer** for the water's optical thickness per fragment — color grade, opacity, contact foam at the waterline and rolling foam lines that ride equal-thickness bands shoreward all fall out of that one number. Facet normals + low roughness make the golden-hour glint. On a coastless world (or the graybox) the node hides itself and costs nothing.
+- **Wading, not swimming (yet)**: the player reads `get_water_depth` each tick; walking in slows like deep sand, and at `wade_depth_limit` (0.4 m, knee-deep — Joshua's call) the deeper-ward velocity component is eased out, with a gentle shoreward push past the limit. A soft wall: motion along the waterline is never touched. All inert off-coast.
+- **Wet sand remembers longer**: `SandDeformation.stamp` resolves `get_wetness` at each stamp and writes press × wetness into the deformation texture's **G channel — the per-material decay-class slot the Phase 5 contract reserved**. The copy shader decays wet prints at `wet_fade_scale` of the dry rate, G scaling with R so the class survives every pass.
+- **Surf bed**: `Ambience` gains an `ocean_surf_loop.ogg` bed (silent-safe like everything in 6.6) whose volume follows `get_shore_distance` — full on the beach, a murmur at the homestead, gone in the desert.
+
+**`tools/verify_ocean.gd` is the phase gate as an executable**:
+
+| mode | question |
+|---|---|
+| *(none)* | shoreline where the pick put it, deterministic per seed? knee-deep band on every transect? seabed reaches the deep? nothing inland floods? coast slopes < 31°? far desert bit-identical to a coastless world? |
+| `--wade` | does the real controller wade to the knee and hold there without bobbing, walk the surf line freely, and come straight back ashore? |
+| `--wetprints` | (windowed) does a print at the waterline outlive one up the dry beach? |
+| `--perf` | (windowed) 60 fps+ with the full ocean vista on screen? |
+
+`tools/shoot_ocean.gd` (windowed) reproduces the review shots, the day sweep and the water-color ladder.
+
 ## Buildings and props (as built in Phase 6, Part 1)
 
 A building is an imported model plus two small scripts; there is no building framework and there should not be one until a second building exists.
