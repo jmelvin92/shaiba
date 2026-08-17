@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="TerrainSettings" load_steps=7 format=3]
+[gd_resource type="Resource" script_class="TerrainSettings" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://resources/terrain/terrain_settings.gd" id="1_settings"]
 
@@ -30,6 +30,11 @@ noise_type = 1
 frequency = 0.18
 fractal_type = 0
 
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_coast"]
+noise_type = 1
+frequency = 0.008
+fractal_type = 0
+
 [resource]
 script = ExtResource("1_settings")
 chunk_size = 64
@@ -39,6 +44,22 @@ dune_noise = SubResource("FastNoiseLite_dune")
 mega_noise = SubResource("FastNoiseLite_mega")
 drift_noise = SubResource("FastNoiseLite_drift")
 ripple_noise = SubResource("FastNoiseLite_ripple")
+coast_noise = SubResource("FastNoiseLite_coast")
+coast_distance = 55.0
+sea_level = -3.8
+coast_wiggle = 10.0
+beach_width = 28.0
+beach_rise = 1.8
+coast_slope_max_deg = 22.0
+seabed_shelf_depth = 4.0
+seabed_shelf_distance = 70.0
+seabed_deep_depth = 24.0
+seabed_deep_distance = 260.0
+seabed_relief = 0.35
+beach_sand_depth = 0.45
+seabed_sand_depth = 0.6
+wet_band = 0.45
+beach_tone = 0.78
 base_amplitude = 3.0
 dune_amplitude = 6.5
 dune_sharpness = 1.35

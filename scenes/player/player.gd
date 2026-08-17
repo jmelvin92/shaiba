@@ -108,6 +108,22 @@ const STEP_CLEARANCE: float = 0.02
 ## How quickly the visible sink follows changes in depth underfoot.
 @export_range(1.0, 40.0, 0.5) var sand_sink_speed: float = 8.0
 
+@export_group("Water")
+## Water depth at which the sea holds the player back, metres — knee deep
+## (Joshua's call, 2026-08-17: wading only for now; swimming comes later).
+@export_range(0.1, 1.5, 0.05) var wade_depth_limit: float = 0.4
+## Multiplier on movement speed at the wading limit — water drags harder than
+## sand. Shallower water scales the drag down proportionally.
+@export_range(0.2, 1.0, 0.05) var wade_speed_scale: float = 0.55
+## Water depth at which the sea starts softly refusing the deeper-ward part of
+## your movement, as a fraction of the limit. 1.0 would make the limit a wall;
+## lower starts easing you off earlier, which is what makes it feel like water
+## rather than glass.
+@export_range(0.3, 1.0, 0.05) var wade_ease_start: float = 0.6
+## Speed of the gentle shoreward push when something (a wave of momentum, a
+## jump) has carried the player past the limit, m/s.
+@export_range(0.0, 3.0, 0.1) var wade_push_speed: float = 0.8
+
 ## Emitted the moment a jump actually launches, not when the key is pressed.
 signal jumped
 ## Emitted on touchdown, carrying the downward speed at impact in m/s.
@@ -173,6 +189,9 @@ var _probe_faces: Array[Vector3] = []
 ## Sand depth under the player this tick, metres. 0 whenever there is no
 ## terrain, which is what keeps every sand effect inert on the graybox.
 var _sand_depth: float = 0.0
+## Water depth over the ground under the player this tick, metres. 0 on dry
+## land and on any level without a coast, keeping wading fully inert there.
+var _water_depth: float = 0.0
 ## How far the mesh is currently lowered to show the feet settling into sand.
 var _sink_offset: float = 0.0
 
@@ -209,9 +228,9 @@ func set_terrain(terrain: TerrainSettings) -> void:
 
 func _physics_process(delta: float) -> void:
 	if _terrain != null:
-		_sand_depth = _terrain.get_sand_depth(
-			Vector2(global_position.x, global_position.z)
-		)
+		var at: Vector2 = Vector2(global_position.x, global_position.z)
+		_sand_depth = _terrain.get_sand_depth(at)
+		_water_depth = _terrain.get_water_depth(at)
 
 	var input_vector: Vector2 = Input.get_vector(
 		"move_left", "move_right", "move_up", "move_down"
@@ -236,6 +255,7 @@ func _physics_process(delta: float) -> void:
 		_face_direction(direction, delta)
 	else:
 		planar = planar.move_toward(Vector3.ZERO, friction * control * delta)
+	planar = _apply_wading(planar)
 	velocity.x = planar.x
 	velocity.z = planar.z
 	_planar_speed = planar.length()
@@ -287,12 +307,63 @@ func _target_speed() -> float:
 		base = crouch_speed
 	elif Input.is_action_pressed("sprint"):
 		base = run_speed
-	return base * lerpf(1.0, deep_sand_speed_scale, _sand_factor())
+	return base * lerpf(1.0, deep_sand_speed_scale, _sand_factor()) * lerpf(
+		1.0, wade_speed_scale, _wade_factor()
+	)
 
 
 ## How deep in sand the player is, 0 (none/hard ground) to 1 (full effect).
 func _sand_factor() -> float:
 	return clampf(_sand_depth / deep_sand_depth, 0.0, 1.0)
+
+
+## How deep in water the player is wading, 0 (dry) to 1 (at the knee limit).
+func _wade_factor() -> float:
+	return clampf(_water_depth / wade_depth_limit, 0.0, 1.0)
+
+
+## Water depth over the ground underfoot this tick, metres — for animation,
+## audio and verify tooling.
+func get_water_depth() -> float:
+	return _water_depth
+
+
+## The sea's answer to walking into it: the deeper-ward component of movement
+## is eased out as the knee limit approaches, and past the limit a gentle
+## current sets the player back toward shore. A soft boundary, never a wall —
+## motion *along* the waterline is untouched at any depth, so walking the surf
+## line feels free while walking out to sea simply stops carrying you.
+func _apply_wading(planar: Vector3) -> Vector3:
+	if _water_depth <= 0.0 or _terrain == null:
+		return planar
+	# Which way is deeper: the planar gradient of water depth underfoot.
+	var here: Vector2 = Vector2(global_position.x, global_position.z)
+	const PROBE: float = 0.75
+	var deeper: Vector3 = Vector3(
+		_terrain.get_water_depth(here + Vector2(PROBE, 0.0))
+			- _terrain.get_water_depth(here - Vector2(PROBE, 0.0)),
+		0.0,
+		_terrain.get_water_depth(here + Vector2(0.0, PROBE))
+			- _terrain.get_water_depth(here - Vector2(0.0, PROBE))
+	)
+	if deeper.length_squared() < 0.000001:
+		return planar
+	deeper = deeper.normalized()
+	var over: float = _water_depth - wade_depth_limit
+	var into: float = planar.dot(deeper)
+	if over < 0.0:
+		if into > 0.0:
+			var ease_from: float = wade_depth_limit * wade_ease_start
+			var refuse: float = clampf(
+				(_water_depth - ease_from) / (wade_depth_limit - ease_from), 0.0, 1.0
+			)
+			planar -= deeper * (into * refuse)
+		return planar
+	# Past the limit (a jump, momentum): stop all deeper-ward motion and ease
+	# back toward the shallows, harder the further past the limit.
+	if into > 0.0:
+		planar -= deeper * into
+	return planar - deeper * (wade_push_speed * clampf(over / 0.2, 0.0, 1.0))
 
 
 ## True while crouched, for anyone driving animation off this controller.

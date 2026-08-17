@@ -75,7 +75,10 @@ static func build_data(settings: TerrainSettings, coord: Vector2i) -> BuildData:
 			# reads as broad patches of lighter and darker sand, not per-vertex
 			# speckle that averages away at the gameplay camera.
 			var depth_norm: float = settings.get_normalized_depth(at)
-			var tone: float = depth_norm + settings.tone_dither * settings.ripple_noise.get_noise_2d(
+			# The visible tint and the print-depth cap split at the coast: the
+			# tone carries the beach/wet/seabed look, while alpha stays the true
+			# normalised sand depth prints are capped by.
+			var tone: float = settings.get_surface_tone(at) + settings.tone_dither * settings.ripple_noise.get_noise_2d(
 				wx * 0.35 + 511.0, wz * 0.35 - 511.0
 			)
 			tone = clampf(tone, 0.0, 1.0)

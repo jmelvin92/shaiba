@@ -29,6 +29,10 @@ extends Node3D
 ## Direct child playing the ambient sound bed, if this level has one. Told to
 ## centre its gusts on the player; a level without one skips it.
 @export var ambience_path: NodePath = ^"Ambience"
+## Direct child drawing the sea surface, if this level has one. Handed the
+## terrain (for sea level and the coast switch) and the player to follow; a
+## level without one — or a coastless world — skips it entirely.
+@export var ocean_path: NodePath = ^"Ocean"
 ## Direct child owning save/load, if this level has one (the graybox doesn't).
 @export var save_system_path: NodePath = ^"SaveSystem"
 ## Direct child holding the pause menu, whose save/load requests the level
@@ -78,6 +82,11 @@ func _ready() -> void:
 		return
 	player.set_terrain(terrain)
 	camera_rig.set_terrain(terrain)
+
+	var ocean: Ocean = get_node_or_null(ocean_path) as Ocean
+	if ocean != null:
+		ocean.set_terrain(terrain)
+		ocean.set_focus(player)
 
 	# The homestead goes onto the pad the terrain levelled for it, and the
 	# player starts in its courtyard — so the game opens looking at the one

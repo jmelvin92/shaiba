@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://scenes/world/level_root.gd" id="1_level"]
 [ext_resource type="PackedScene" path="res://scenes/world/desert_environment.tscn" id="2_env"]
@@ -13,6 +13,7 @@
 [ext_resource type="PackedScene" path="res://scenes/audio/music.tscn" id="11_music"]
 [ext_resource type="PackedScene" path="res://scenes/ui/pause_menu/pause_menu.tscn" id="12_pause"]
 [ext_resource type="Script" path="res://scenes/world/save_system.gd" id="13_save"]
+[ext_resource type="PackedScene" path="res://scenes/world/ocean/ocean.tscn" id="14_ocean"]
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_level")
@@ -26,6 +27,8 @@ load_radius = 5
 unload_radius = 6
 
 [node name="DebugOverlay" parent="ChunkManager" instance=ExtResource("5_overlay")]
+
+[node name="Ocean" parent="." instance=ExtResource("14_ocean")]
 
 [node name="SandDeformation" parent="." instance=ExtResource("8_sand")]
 
