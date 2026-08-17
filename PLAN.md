@@ -19,6 +19,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🟡 In progress — Part 1 + door/interaction system done (awaiting look review), Part 2 needs Meshy assets |
 | 6.5 | Game clock, day-night cycle & lighting (side-track) | `feature/daynight-lighting` | 🟡 In progress — clock ✅; cycle ✅; lighting built & verified 2026-08-15 (lamp, torch, flames, real windows), awaiting flicker playtest |
 | 6.6 | Audio system (side-track) | `feature/audio-system` | 🟡 Engine done; first sound batch in & mix approved by ear 2026-08-15 (sand steps, doors, wind, music); pause menu (Esc) + settings audio sliders + UI sounds in 2026-08-15. Remaining: fire/landing/shuffle/indoor sounds, then final listen-through |
+| 6.7 | Ocean biome — the western sea | `feature/ocean-biome` | 🔲 Not started — **⚠️ Joshua playtests before anything is pushed to GitHub** (see the phase's hard gate) |
 | 7 | Integration & polish → v0.1 | `feature/phase-7-polish` | 🔲 Not started |
 
 Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `development` · ✅ Done (merged, gate passed)
@@ -380,6 +381,56 @@ The engine is stable and the tuning loop with Joshua converged. What the next se
 - **Pause menu detour (2026-08-15, Joshua's request):** Esc pauses and opens a palette-styled menu (Resume / Settings → Audio) with Music and Sound sliders, persisted to `user://settings.cfg`. The bus layout gained a parent `Sound` bus over Ambience + SFX so the slider never fights the AcousticZone's ducking — mix baselines untouched. Hover/click UI sounds sourced by Joshua live in `assets/audio/ui/`; music keeps playing under the menu. Gate: `tools/verify_pause.gd` (all pass, plus `verify_audio` re-run green on the new layout). See DECISIONS.
 - **Save/load detour (2026-08-15, Joshua's request, same session):** Save Game / Load Game in the pause menu, one slot (`user://saves/save_01.json`). Built as the persistence contract Joshua asked to future-proof — stable keys, group-walked, unknown keys warn-and-skip (ARCHITECTURE → Persistence). Saves today: clock+seed, player, camera, both doors, lamp, carried torch; footprints deliberately ephemeral. Gate: `tools/verify_save.gd` all pass; full battery re-run green (pause, audio, clock, house, lighting, cycle, player). This removes save/load from the "later" list.
 
+## Phase 6.7 — Ocean biome: the western sea (major expansion)
+
+**Added 2026-08-17 at Joshua's direction.** The map grows a coastline: **west of the desert**, the dunes descend to a shore and the world continues as open ocean. This is a *natural extension of the existing map*, not a replacement — **the desert stays exactly as it is**, the ocean joins it the way a real desert meets a real sea. The bar is explicit and higher than usual: **incredible depth, absolutely stunning** — this biome is meant to be a second signature alongside the living sand, and it gets at least the care Phases 4–5 gave the desert. It is numbered as a side-track but scoped as a major phase (Phase 6-sized, in parts).
+
+### ⚠️ Hard gate — Joshua tests before GitHub sees any of it
+
+**Branch parentage:** `feature/ocean-biome` branches off `feature/audio-system` rather than `development` — the same reasoning as 6.6 off 6.5: the ocean extends the day-night/fog contract (6.5) and the audio hooks (6.6) that only exist on that line. It merges after 6.6 does.
+
+**Nothing from this phase is ever pushed to the GitHub remote — not the feature branch, not a merge to `development` — until Joshua has played the ocean in the running game and signed off.** Local commits on `feature/ocean-biome` are fine and expected (that is how work is saved and handed between sessions), but `git push` of any ocean work waits for his approval. This deliberately supersedes the usual "merge and push when the gate passes" flow for this phase; every session working on it must respect it, including partial/handoff sessions. The rule is also recorded in DECISIONS.md.
+
+### Planning session first (the Phase 6.5 pattern)
+
+Deliverables below are the intended shape; the first ocean session is a **planning conversation with Joshua** before any build, where his calls get made and recorded:
+
+1. **Where the shore lies** — ✅ **decided (Joshua, 2026-08-17): about a 30-second walk west of the homestead.** At walk speed 1.8 m/s that puts the waterline ≈ 55 m west (an 11-second run). Close enough that the sea is part of the homestead's view and daily life, not an expedition — the exact shoreline curve still comes from the seeded coastline, this fixes its mean distance. Note for the build: at ~55 m the coast sits well inside the fog-free zone (fog starts at 100 m), so the water is seen crisp and full-color from the courtyard — the golden-hour ladder must be shot from there.
+2. **How far in the player goes** — wade only, surface swim, or diving. The plan below assumes at least surface swimming (an ocean you can't enter isn't deep in any sense); diving is his call.
+3. **The water palette** — ocean blues/turquoise, foam white, wet sand are all *new colors*, which the palette rule says means an ART_DIRECTION amendment chosen from same-vantage screenshot ladders, not improvisation.
+4. **What lives there** — fish, gulls, crabs… cozy tone holds at the sea too. Also: does anything about the shore tie into the future survival layer (fresh water? fishing?) worth leaving hooks for.
+
+### Part 1 — Coastline & the sea surface (the stunning look)
+
+**Deliverables**
+- **Coastline in the analytic terrain model** (`resources/terrain/terrain_settings.gd`): a deterministic, seeded shoreline west of spawn — gently irregular bays and headlands, never a straight line — blending desert → back-dunes → beach → seabed that keeps descending underwater. The existing analytic queries (`get_surface_height` / `get_base_height` / `get_sand_depth`) extend naturally (the seabed *is* terrain), plus new helpers the other systems key off: `get_water_depth(world_xz)` and `distance_to_shore(world_xz)`. The desert body and the homestead stay unchanged in character; the world hash will change (as it did in the restyle) and the homestead re-seats — the full verify battery must stay green.
+- **The sea surface**: `scenes/world/ocean/` + `shaders/ocean_water.gdshader` — stylized low-poly flat-shaded water in the game's language: vertex-displaced rolling waves (visual only; derivative normals like the sand), color graded by true water depth (bright shallow → deep blue), a foam band where water meets sand, breakers rolling onto the beach, and sun/moon glint driven by the day-night cycle. **The 16:00 golden hour over water is the money shot** — calibrate for it the way the cycle calibrates the desert.
+- **The Phase 4 horizon contract extends over the sea**: fog melt at every hour over water too, streaming edge never visible looking out to sea. `verify_cycle`'s fog contract grows a west-facing check.
+- **Wet sand band**: darker, firmer sand near the waterline — and **footprints in wet sand persist longer**, finally cashing in the deformation texture's reserved G-channel material-class hook from Phase 5 (DECISIONS 2026-08-14 said don't repurpose it; this is what it was for).
+- **Streaming**: ocean chunks must be cheap (far-out seabed is simple) and the water surface either per-chunk tiles or a player-following sheet — a profiled choice, recorded in DECISIONS. Same streaming budget as Phase 4: no hitches > 4 ms.
+- **Beach props** through the established pipeline (committed headless Blender scripts, palette-only, `collision_layer = 5`): rocks, driftwood, shells, beach grass — picked with Joshua as-we-go like the desert props.
+- **Audio hooks, silent-safe per 6.6**: a waves bed whose volume/character keys off `distance_to_shore`, gull and gust one-shots; `assets/audio/README.md` grows the sourcing checklist (Joshua sources, as ever).
+- **Ladders for every visual pick**: water colors, wave scale/speed, foam intensity, wet-sand tone — same-vantage screenshot ladders (artifact flip-page), Joshua picks, values locked and documented.
+- `tools/verify_ocean.gd` (determinism, seams, collision-vs-visual at the shoreline, fog contract at sea, perf) and `tools/shoot_ocean.gd` (reproduces the visual evidence) — the gate as executables, per house style.
+
+### Part 2 — Into the water (the depth)
+
+**Deliverables** *(shaped by the planning calls — adjust there, not mid-build)*
+- **Swimming**: water detection off `get_water_depth`, wading with visible slow-down as it deepens, then a surface-swim state (slower than walk, no jump, smooth enter/exit at the waterline — getting stuck where waves meet sand is the failure mode to test hardest). Swim animations join the Meshy sourcing list alongside the Phase 6 Part 2 clips; until they land, the system runs with the best existing pose (the 6.6 "missing assets are silent, never errors" principle, applied to animation).
+- **The view into the shallows**: at the fixed 19° camera the player sees *into* the water from above — so the shallows are where the beauty budget goes: seabed detail (seagrass, rocks, sand ripples continuing underwater), light dapple/caustic suggestion in the palette's language, fish visible as moving shapes, everything fading into deep-blue mystery further out.
+- **Sea life**: fish schools as a self-contained ambient prop (the camel pattern — wanders a home region, never intersects the player, `collision_layer` rules respected), crabs on the beach; each its own scene folder, each reusable.
+- **A natural swim boundary** decided with Joshua — the ocean must *feel* endless while the map stays bounded (depth-based fatigue, a gentle current that turns you home, or simple distance — his pick, recorded in DECISIONS).
+
+**Quality Gate** (whole phase)
+- [ ] **The hard gate above: Joshua has played the ocean — walked the coast, entered the water, seen it at golden hour and at night — and signed off. Only after that does anything get pushed to GitHub or merged to `development`.**
+- [ ] Approaching from the desert reads as one continuous, natural world: dunes → beach → sea with no visible seam between the biomes, screenshot-reviewed at the gameplay camera across the day (dawn / noon / 16:00 golden hour / night).
+- [ ] Water look approved from the ladders; all new colors added to ART_DIRECTION's palette table with hex values + `resources/palette/` materials; no off-palette color anywhere in the biome.
+- [ ] `verify_ocean` passes and the full existing battery stays green (`verify_terrain` incl. determinism/seams/collision audits, `verify_player`, `verify_house`, `verify_prints`, `verify_cycle` incl. the extended fog contract, `verify_clock`, `verify_lighting`, `verify_audio`, `verify_pause`, `verify_save`) — the desert and homestead are provably unharmed.
+- [ ] Swimming (to whatever depth planning settled on) feels right to Joshua; the waterline transition never traps or jitters the player.
+- [ ] 60 fps+ with the full ocean vista on screen at default window size; streaming budget holds crossing the coastline in both directions.
+- [ ] Footprints on wet sand behave (deeper-reading, slower-fading) and ordinary desert prints are byte-identical in behavior.
+- [ ] PLAN.md updated; DECISIONS entries for every call; merged to `development` **only after** the Joshua gate.
+
 ## Phase 7 — Integration & polish → v0.1
 
 **Goal:** everything together, tuned as one game; ship the first stable `main`.
@@ -388,7 +439,7 @@ The engine is stable and the tuning loop with Joshua converged. What the next se
 - Full pass on lighting/environment: warm late-afternoon sun, soft shadows tuned, subtle fog/height haze for depth, sky gradient matched to palette.
 - Performance pass: profile, fix any regressions, confirm all gates from phases 2–6 still pass in the combined game.
 - Consistency sweep: naming, folder hygiene, dead code/scenes removed, every script typed and warning-free, docs updated to reality.
-- A 5-minute "playtest loop": spawn near the homestead, walk the dunes, watch prints fade, meet the camel — verified start-to-finish with no errors.
+- A 5-minute "playtest loop": spawn near the homestead, walk the dunes, watch prints fade, meet the camel — and if Phase 6.7 has merged by then, continue west to the shore — verified start-to-finish with no errors.
 - Merge `development` → `main`, tag `v0.1.0`.
 
 **Quality Gate**
@@ -401,4 +452,4 @@ The engine is stable and the tuning loop with Joshua converged. What the next se
 
 ## After v0.1 (future planning session)
 
-Survival layer (thirst/heat/shade), day-night cycle, inventory, more POIs and biome variation within the desert, sound & music, save/load. Plan these in a dedicated session that writes PLAN-v0.2.md or extends this file.
+Survival layer (thirst/heat/shade), day-night cycle, inventory, more POIs and biome variation within the desert, sound & music, save/load. Plan these in a dedicated session that writes PLAN-v0.2.md or extends this file. *(Biome expansion started early: Joshua pulled an ocean biome forward on 2026-08-17 — see Phase 6.7.)*
