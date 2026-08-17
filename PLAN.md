@@ -19,7 +19,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 6 | Environment assets (house & camel) | `feature/phase-6-environment` | 🟡 In progress — Part 1 + door/interaction system done (awaiting look review), Part 2 needs Meshy assets |
 | 6.5 | Game clock, day-night cycle & lighting (side-track) | `feature/daynight-lighting` | 🟡 In progress — clock ✅; cycle ✅; lighting built & verified 2026-08-15 (lamp, torch, flames, real windows), awaiting flicker playtest |
 | 6.6 | Audio system (side-track) | `feature/audio-system` | 🟡 Engine done; first sound batch in & mix approved by ear 2026-08-15 (sand steps, doors, wind, music); pause menu (Esc) + settings audio sliders + UI sounds in 2026-08-15. Remaining: fire/landing/shuffle/indoor sounds, then final listen-through |
-| 6.7 | Ocean biome — the western sea | `feature/ocean-biome` | 🔲 Not started — **⚠️ Joshua playtests before anything is pushed to GitHub** (see the phase's hard gate) |
+| 6.7 | Ocean biome — the western sea | `feature/ocean-biome` | 🟡 Planned 2026-08-17 (shore ≈55 m west, knee-deep wading now, swim/dive/submarine roadmap recorded); build not started — **⚠️ Joshua playtests before anything is pushed to GitHub** (see the phase's hard gate) |
 | 7 | Integration & polish → v0.1 | `feature/phase-7-polish` | 🔲 Not started |
 
 Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `development` · ✅ Done (merged, gate passed)
@@ -396,9 +396,9 @@ The engine is stable and the tuning loop with Joshua converged. What the next se
 Deliverables below are the intended shape; the first ocean session is a **planning conversation with Joshua** before any build, where his calls get made and recorded:
 
 1. **Where the shore lies** — ✅ **decided (Joshua, 2026-08-17): about a 30-second walk west of the homestead.** At walk speed 1.8 m/s that puts the waterline ≈ 55 m west (an 11-second run). Close enough that the sea is part of the homestead's view and daily life, not an expedition — the exact shoreline curve still comes from the seeded coastline, this fixes its mean distance. Note for the build: at ~55 m the coast sits well inside the fog-free zone (fog starts at 100 m), so the water is seen crisp and full-color from the courtyard — the golden-hour ladder must be shot from there.
-2. **How far in the player goes** — wade only, surface swim, or diving. The plan below assumes at least surface swimming (an ocean you can't enter isn't deep in any sense); diving is his call.
+2. **How far in the player goes** — ✅ **decided (Joshua, 2026-08-17): knee-deep, for now.** The player wades in and is gently stopped around knee depth — no swimming yet. The long-term vision is recorded in the roadmap below and it is big: full swimming, then diving, eventually a **submarine simulation**. The ocean is planned as a huge feature that grows over many sessions; this phase ships the shore of it, built so none of that is blocked.
 3. **The water palette** — ocean blues/turquoise, foam white, wet sand are all *new colors*, which the palette rule says means an ART_DIRECTION amendment chosen from same-vantage screenshot ladders, not improvisation.
-4. **What lives there** — fish, gulls, crabs… cozy tone holds at the sea too. Also: does anything about the shore tie into the future survival layer (fresh water? fishing?) worth leaving hooks for.
+4. **What lives there** — ✅ **decided (Joshua, 2026-08-17): eventually all of it** — fish schools in the shallows, crabs on the beach, gulls overhead, something big surfacing offshore — **added gradually over time as we see fit**. None of it gates this phase: the current job is a beautiful, *functioning* biome. Survival-layer shore hooks (fishing, fresh water) stay an open question for a later planning talk.
 
 ### Part 1 — Coastline & the sea surface (the stunning look)
 
@@ -410,23 +410,27 @@ Deliverables below are the intended shape; the first ocean session is a **planni
 - **Streaming**: ocean chunks must be cheap (far-out seabed is simple) and the water surface either per-chunk tiles or a player-following sheet — a profiled choice, recorded in DECISIONS. Same streaming budget as Phase 4: no hitches > 4 ms.
 - **Beach props** through the established pipeline (committed headless Blender scripts, palette-only, `collision_layer = 5`): rocks, driftwood, shells, beach grass — picked with Joshua as-we-go like the desert props.
 - **Audio hooks, silent-safe per 6.6**: a waves bed whose volume/character keys off `distance_to_shore`, gull and gust one-shots; `assets/audio/README.md` grows the sourcing checklist (Joshua sources, as ever).
+- **Wading, capped at the knees**: walking into the water is felt — the deep-sand movement pattern reapplied to water (slow-down as it deepens, small splash-step feedback) — and around knee depth (water depth ≈ 0.4 m, tunable export) a *gentle* stop keeps the player from going deeper: a soft push back toward shore, never a wall-bump. Wading/splash sounds join the silent-safe audio hooks.
 - **Ladders for every visual pick**: water colors, wave scale/speed, foam intensity, wet-sand tone — same-vantage screenshot ladders (artifact flip-page), Joshua picks, values locked and documented.
 - `tools/verify_ocean.gd` (determinism, seams, collision-vs-visual at the shoreline, fog contract at sea, perf) and `tools/shoot_ocean.gd` (reproduces the visual evidence) — the gate as executables, per house style.
 
-### Part 2 — Into the water (the depth)
+### Part 2 — deferred: the ocean roadmap (Joshua's direction, 2026-08-17)
 
-**Deliverables** *(shaped by the planning calls — adjust there, not mid-build)*
-- **Swimming**: water detection off `get_water_depth`, wading with visible slow-down as it deepens, then a surface-swim state (slower than walk, no jump, smooth enter/exit at the waterline — getting stuck where waves meet sand is the failure mode to test hardest). Swim animations join the Meshy sourcing list alongside the Phase 6 Part 2 clips; until they land, the system runs with the best existing pose (the 6.6 "missing assets are silent, never errors" principle, applied to animation).
-- **The view into the shallows**: at the fixed 19° camera the player sees *into* the water from above — so the shallows are where the beauty budget goes: seabed detail (seagrass, rocks, sand ripples continuing underwater), light dapple/caustic suggestion in the palette's language, fish visible as moving shapes, everything fading into deep-blue mystery further out.
-- **Sea life**: fish schools as a self-contained ambient prop (the camel pattern — wanders a home region, never intersects the player, `collision_layer` rules respected), crabs on the beach; each its own scene folder, each reusable.
-- **A natural swim boundary** decided with Joshua — the ocean must *feel* endless while the map stays bounded (depth-based fatigue, a gentle current that turns you home, or simple distance — his pick, recorded in DECISIONS).
+**Not this phase's work and not its gate** — recorded so every ocean session builds toward it instead of accidentally against it. The ocean is planned as a **huge, long-term feature** that grows gradually, roughly in this order, each stage getting its own planning session and gate when Joshua pulls it forward:
+
+1. **Surface swimming** (the knee-deep cap lifts; swim animations join the Meshy sourcing list when this starts).
+2. **Diving / underwater traversal** — will need its own conversation about the fixed-pitch camera, breath, underwater rendering.
+3. **Submarine simulation** — Joshua's stated end-goal for the deep water.
+4. **Sea life, added piecemeal as we see fit**: fish schools in the shallows (the main payoff of looking down into water at our camera angle), crabs on the beach (tiny tracks via the Phase 5 stamper), gulls overhead (audio + simple silhouettes), and something big surfacing far offshore.
+
+**What Part 1 must therefore get right now, so none of this is blocked**: `get_water_depth` stays correct at *every* depth, not just the wading band; the seabed is real terrain (mesh + analytic + collision) all the way out, not a painted floor; the depth-graded water color is honest so deep water already *reads* deep from the surface; and the visual budget favors the shallows — seabed detail (seagrass, rocks, sand ripples continuing underwater, light-dapple suggestion in the palette's language) fading into deep-blue mystery, because at the fixed 19° camera looking *into* the shallows is the view the ocean lives in.
 
 **Quality Gate** (whole phase)
-- [ ] **The hard gate above: Joshua has played the ocean — walked the coast, entered the water, seen it at golden hour and at night — and signed off. Only after that does anything get pushed to GitHub or merged to `development`.**
+- [ ] **The hard gate above: Joshua has played the ocean — walked the coast, waded in, seen it at golden hour and at night — and signed off. Only after that does anything get pushed to GitHub or merged to `development`.**
 - [ ] Approaching from the desert reads as one continuous, natural world: dunes → beach → sea with no visible seam between the biomes, screenshot-reviewed at the gameplay camera across the day (dawn / noon / 16:00 golden hour / night).
 - [ ] Water look approved from the ladders; all new colors added to ART_DIRECTION's palette table with hex values + `resources/palette/` materials; no off-palette color anywhere in the biome.
 - [ ] `verify_ocean` passes and the full existing battery stays green (`verify_terrain` incl. determinism/seams/collision audits, `verify_player`, `verify_house`, `verify_prints`, `verify_cycle` incl. the extended fog contract, `verify_clock`, `verify_lighting`, `verify_audio`, `verify_pause`, `verify_save`) — the desert and homestead are provably unharmed.
-- [ ] Swimming (to whatever depth planning settled on) feels right to Joshua; the waterline transition never traps or jitters the player.
+- [ ] Wading feels right to Joshua: entering the water slows you believably, the knee-deep stop is gentle (no wall-bump, no jitter, no getting trapped where waves meet sand), and walking the surf line is comfortable.
 - [ ] 60 fps+ with the full ocean vista on screen at default window size; streaming budget holds crossing the coastline in both directions.
 - [ ] Footprints on wet sand behave (deeper-reading, slower-fading) and ordinary desert prints are byte-identical in behavior.
 - [ ] PLAN.md updated; DECISIONS entries for every call; merged to `development` **only after** the Joshua gate.
