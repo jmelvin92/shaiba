@@ -76,6 +76,7 @@ exist. Sand works this way.
 | `wind_day_loop.ogg` | Warm daytime desert wind bed, 1–2 min seamless loop, stereo OK |
 | `wind_night_loop.ogg` | Night desert — sparser, colder, slightly unsettling, seamless loop |
 | `gust_01..04.wav` | Individual wind gusts that can sweep past, mono, ~3–8 s |
+| `ocean_surf_loop.ogg` | Ocean surf from the beach (Phase 6.7): steady waves breaking and washing, 1–2 min seamless loop, stereo OK. Fades in on the walk west; a distant murmur at the homestead. |
 
 ## ui/ — menu feedback (sourced 2026-08-15)
 
@@ -92,7 +93,9 @@ exist. Sand works this way.
 
 ## Later (do NOT source yet — listed so the plan stays in one place)
 
-Camel (grunts, steps, chewing) · sand-slide on steep dunes · night creature ·
+Water wading steps + splashes (footsteps in the swash, entering/leaving the
+sea — the footstep system will grow a `wet`/`water` surface when these land) ·
+gulls for the coast · Camel (grunts, steps, chewing) · sand-slide on steep dunes · night creature ·
 music · **weather system sounds** (the current wind bed is a deliberately
 subtle stopgap; a future weather system brings sandstorm/gust-front/calm
 variants and takes over the ambience). This file is the ever-growing list:

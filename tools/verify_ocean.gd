@@ -59,8 +59,249 @@ func _run() -> void:
 		_wetness_shape()
 		_desert_untouched()
 		return
+	if args.has("--wade"):
+		await _wade()
+		return
+	if args.has("--wetprints"):
+		await _wet_prints()
+		return
+	if args.has("--perf"):
+		await _perf()
+		return
 	push_error("verify_ocean: unknown mode %s" % " ".join(args))
 	_failures.append("unknown mode: " + " ".join(args))
+
+
+## Drives the real player into the real sea in the real world scene: walking
+## west wades in and is held gently at the knee limit without jitter, walking
+## the surf line stays free, and walking east comes straight back ashore.
+func _wade() -> void:
+	var level: Node3D = (load("res://scenes/world/world.tscn") as PackedScene).instantiate() as Node3D
+	root.add_child(level)
+	await process_frame
+	await process_frame
+
+	var player: Player = level.get_node(^"Player") as Player
+	var chunks: ChunkManager = level.get_node(^"ChunkManager") as ChunkManager
+	var ocean: Ocean = level.get_node(^"Ocean") as Ocean
+	var terrain: TerrainSettings = chunks.get_terrain()
+	if not terrain.has_coast():
+		_fail("wade: the live world has no coast")
+		return
+	if ocean == null or not ocean.visible:
+		_fail("wade: the Ocean node is missing or hidden in a coastal world")
+		return
+	if absf(ocean.global_position.y - terrain.get_sea_level()) > 0.01:
+		_fail(
+			"wade: the sea surface sits at %.2f, not sea level %.2f"
+			% [ocean.global_position.y, terrain.get_sea_level()]
+		)
+
+	# Start on the dry beach at the homestead's latitude, facing out to sea.
+	var z: float = terrain.get_homestead_center().y
+	var shore_x: float = _waterline_x(terrain, z)
+	var start: Vector2 = Vector2(shore_x + 6.0, z)
+	player.global_position = Vector3(
+		start.x, terrain.get_surface_height(start) + 0.1, start.y
+	)
+	player.reset_physics_interpolation()
+	chunks.set_tracked(player)
+	# "up" now points west (-X): straight into the sea.
+	player.set_view_yaw(PI / 2.0)
+
+	Engine.time_scale = 6.0
+	Input.action_press("move_up")
+	var deepest: float = 0.0
+	var trail: PackedVector3Array = []
+	for frame: int in range(60 * 30):
+		await physics_frame
+		deepest = maxf(deepest, player.get_water_depth())
+		if frame >= 60 * 24:
+			trail.append(player.global_position)
+	Input.action_release("move_up")
+
+	if deepest < 0.3:
+		_fail("wade: 30 s of walking west never reached knee depth (%.2f m)" % deepest)
+	if deepest > player.wade_depth_limit + 0.06:
+		_fail(
+			"wade: carried past the limit — %.2f m against %.2f"
+			% [deepest, player.wade_depth_limit]
+		)
+	# What must hold still at the boundary is the *cross-shore* position — the
+	# component pushing out to sea. Sliding along an obliquely-met shoreline is
+	# the soft wall working as intended, so tangential drift is free.
+	var anchor: Vector2 = Vector2(trail[0].x, trail[0].z)
+	var probe: float = 0.75
+	var deeper: Vector2 = Vector2(
+		terrain.get_water_depth(anchor + Vector2(probe, 0.0))
+			- terrain.get_water_depth(anchor - Vector2(probe, 0.0)),
+		terrain.get_water_depth(anchor + Vector2(0.0, probe))
+			- terrain.get_water_depth(anchor - Vector2(0.0, probe))
+	).normalized()
+	var cross_drift: float = 0.0
+	var tangent_drift: float = 0.0
+	for point: Vector3 in trail:
+		var offset: Vector2 = Vector2(point.x, point.z) - anchor
+		cross_drift = maxf(cross_drift, absf(offset.dot(deeper)))
+		tangent_drift = maxf(tangent_drift, absf(offset.dot(Vector2(-deeper.y, deeper.x))))
+	print(
+		"wade: deepest %.2f m (limit %.2f); at the boundary: cross-shore drift %.2f m, along-shore %.2f m"
+		% [deepest, player.wade_depth_limit, cross_drift, tangent_drift]
+	)
+	if cross_drift > 0.5:
+		_fail("wade: player bobs across the wading limit (%.2f m cross-shore drift)" % cross_drift)
+
+	# Along the surf line the sea must not hold you at all.
+	var before: Vector3 = player.global_position
+	Input.action_press("move_left")
+	for _frame: int in range(60 * 6):
+		await physics_frame
+	Input.action_release("move_left")
+	var along: float = before.distance_to(player.global_position)
+	print("wade: 6 s along the waterline covered %.1f m" % along)
+	if along < 4.0:
+		_fail("wade: walking along the waterline only covered %.1f m in 6 s" % along)
+
+	# And it lets you straight back out.
+	Input.action_press("move_down")
+	for _frame: int in range(60 * 8):
+		await physics_frame
+	Input.action_release("move_down")
+	if player.get_water_depth() > 0.0:
+		_fail(
+			"wade: could not walk back ashore (still in %.2f m of water)"
+			% player.get_water_depth()
+		)
+	Engine.time_scale = 1.0
+	level.queue_free()
+	await process_frame
+
+
+## Windowed (needs a real renderer for the SubViewport readback): a print
+## stamped on the wet swash band must outlive one stamped on the dry beach —
+## the G-channel decay class doing its job on the real terrain.
+func _wet_prints() -> void:
+	var level: Node3D = (load("res://scenes/world/world.tscn") as PackedScene).instantiate() as Node3D
+	root.add_child(level)
+	await process_frame
+	await process_frame
+
+	var player: Player = level.get_node(^"Player") as Player
+	var chunks: ChunkManager = level.get_node(^"ChunkManager") as ChunkManager
+	var sand: SandDeformation = level.get_node(^"SandDeformation") as SandDeformation
+	var terrain: TerrainSettings = chunks.get_terrain()
+	var z: float = terrain.get_homestead_center().y
+	var shore_x: float = _waterline_x(terrain, z)
+	player.global_position = Vector3(
+		shore_x + 8.0, terrain.get_surface_height(Vector2(shore_x + 8.0, z)) + 0.1, z
+	)
+	player.reset_physics_interpolation()
+	chunks.set_tracked(player)
+	# Fixed-point probes: wind drift must be off (the documented rule).
+	sand.wind_drift_per_minute = 0.0
+	sand.fade_seconds = 30.0
+	for _i: int in range(30):
+		await physics_frame
+
+	var wet_at: Vector2 = Vector2(shore_x + 0.3, z + 10.0)
+	var dry_at: Vector2 = Vector2(shore_x + 18.0, z - 10.0)
+	var wet_w: float = terrain.get_wetness(wet_at)
+	var dry_w: float = terrain.get_wetness(dry_at)
+	print("wetprints: wetness %.2f at the waterline, %.2f up the beach" % [wet_w, dry_w])
+	if wet_w < 0.7:
+		_fail("wetprints: the waterline stamp point reads %.2f wet, wanted > 0.7" % wet_w)
+	if dry_w > 0.05:
+		_fail("wetprints: the dry-beach stamp point reads %.2f wet, wanted ~0" % dry_w)
+	# The beach takes a full print: its normalised depth clears the shader's
+	# print cap (alpha × tone_full/print_full ≥ 1).
+	var cap: float = terrain.get_normalized_depth(dry_at) * (
+		terrain.tone_full_depth / sand.print_full_depth
+	)
+	if cap < 1.0:
+		_fail("wetprints: beach print cap %.2f — prints there would be faint" % cap)
+
+	sand.stamp(wet_at, 0.4, 1.0)
+	sand.stamp(dry_at, 0.4, 1.0)
+	for _i: int in range(10):
+		await physics_frame
+
+	Engine.time_scale = 10.0
+	for _i: int in range(60 * 20):
+		await physics_frame
+	Engine.time_scale = 1.0
+
+	var wet_left: float = _value_at(sand, wet_at)
+	var dry_left: float = _value_at(sand, dry_at)
+	print(
+		"wetprints: after 20 s of a 30 s fade — wet print %.2f, dry print %.2f"
+		% [wet_left, dry_left]
+	)
+	if dry_left > 0.55:
+		_fail("wetprints: the dry print barely decayed (%.2f)" % dry_left)
+	if wet_left < dry_left + 0.25:
+		_fail(
+			"wetprints: the wet print (%.2f) does not meaningfully outlive the dry one (%.2f)"
+			% [wet_left, dry_left]
+		)
+	level.queue_free()
+	await process_frame
+
+
+## Windowed: frame cost with the full ocean vista on screen — player on the
+## beach, camera west over the water, 600 frames measured (the verify_cycle
+## --perf pattern). The gate asks for 60 fps+; the baseline elsewhere is ~120.
+func _perf() -> void:
+	var level: Node3D = (load("res://scenes/world/world.tscn") as PackedScene).instantiate() as Node3D
+	root.add_child(level)
+	await process_frame
+	await process_frame
+	var player: Player = level.get_node(^"Player") as Player
+	var chunks: ChunkManager = level.get_node(^"ChunkManager") as ChunkManager
+	var rig: CameraRig = level.find_child("CameraRig", true, false) as CameraRig
+	var terrain: TerrainSettings = chunks.get_terrain()
+	var z: float = terrain.get_homestead_center().y
+	var shore_x: float = _waterline_x(terrain, z)
+	player.global_position = Vector3(
+		shore_x + 10.0, terrain.get_surface_height(Vector2(shore_x + 10.0, z)) + 0.1, z
+	)
+	player.reset_physics_interpolation()
+	chunks.set_tracked(player)
+	rig.set_yaw_degrees(90.0)
+	rig.snap_to_target()
+	for _i: int in range(240):
+		await process_frame
+
+	var worst_ms: float = 0.0
+	var total_us: int = 0
+	var last: int = Time.get_ticks_usec()
+	for _i: int in range(600):
+		await process_frame
+		var now: int = Time.get_ticks_usec()
+		var frame_us: int = now - last
+		last = now
+		total_us += frame_us
+		worst_ms = maxf(worst_ms, float(frame_us) / 1000.0)
+	var fps: float = 600.0 / (float(total_us) / 1_000_000.0)
+	print("perf: %.0f fps average over 600 frames, worst frame %.2f ms" % [fps, worst_ms])
+	if fps < 60.0:
+		_fail("perf: %.0f fps with the ocean on screen — under the 60 fps gate" % fps)
+	level.queue_free()
+	await process_frame
+
+
+## Reads the deformation R value at a world position (verify_prints pattern).
+func _value_at(sand: SandDeformation, world_xz: Vector2) -> float:
+	var state: Dictionary = sand.get_debug_state()
+	var origin: Vector2 = state["origin"]
+	var image: Image = (state["texture"] as ViewportTexture).get_image()
+	var uv: Vector2 = (world_xz - origin) / sand.region_size
+	if uv.x < 0.0 or uv.x > 1.0 or uv.y < 0.0 or uv.y > 1.0:
+		return -1.0
+	var px: Vector2i = Vector2i(
+		clampi(int(uv.x * image.get_width()), 0, image.get_width() - 1),
+		clampi(int(uv.y * image.get_height()), 0, image.get_height() - 1)
+	)
+	return image.get_pixelv(px).r
 
 
 func _fail(message: String) -> void:

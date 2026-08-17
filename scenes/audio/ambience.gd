@@ -26,6 +26,14 @@ const GameClock := preload("res://autoload/game.gd")
 ## Full-night loudness of the night bed.
 @export_range(-40.0, 6.0, 0.5) var night_volume_db: float = -3.0
 
+@export_group("Surf")
+## Loudness of the ocean surf bed when standing at the waterline (Phase 6.7).
+@export_range(-40.0, 6.0, 0.5) var surf_volume_db: float = -4.0
+## Metres inland from the waterline over which the surf fades to silence.
+## Chosen so the sea is clearly audible on the beach, a murmur at the
+## homestead (~55 m), and gone in the open desert.
+@export_range(20.0, 300.0, 5.0) var surf_fade_distance: float = 110.0
+
 @export_group("Gusts")
 ## Loudness of a gust one-shot at its source.
 @export_range(-40.0, 6.0, 0.5) var gust_volume_db: float = -4.0
@@ -38,7 +46,11 @@ const GameClock := preload("res://autoload/game.gd")
 var _game: Node = null
 var _day: AudioStreamPlayer = null
 var _night: AudioStreamPlayer = null
+var _surf: AudioStreamPlayer = null
 var _gust: AudioStreamPlayer3D = null
+## Terrain query source for the surf bed's shore distance, handed down by the
+## level. Null (graybox, standalone, coastless world) keeps the surf silent.
+var _terrain: TerrainSettings = null
 ## Whose surroundings the gusts happen in — the player, handed down by the
 ## level. Falls back to this node's own position standalone.
 var _focus: Node3D = null
@@ -56,6 +68,7 @@ func _ready() -> void:
 		# keeps the same quiet wind instead of falling dead silent.
 		night_stream = SoundBank.stream("ambience/wind_day_loop.ogg", true)
 	_night = _make_bed(night_stream)
+	_surf = _make_bed(SoundBank.stream("ambience/ocean_surf_loop.ogg", true))
 	_gust = AudioStreamPlayer3D.new()
 	_gust.bus = &"Ambience"
 	_gust.max_distance = 60.0
@@ -69,6 +82,21 @@ func set_focus(focus: Node3D) -> void:
 	_focus = focus
 
 
+## Called by a level that has terrain, so the surf bed can hear the shore.
+func set_terrain(terrain: TerrainSettings) -> void:
+	_terrain = terrain
+
+
+## How loud the surf runs at a listener position, 0–1: full at the waterline
+## (and in the water), fading to nothing surf_fade_distance inland. Pure, for
+## the verify harness; INF shore distance (no coast) gives exactly 0.
+func surf_weight(at: Vector2) -> float:
+	if _terrain == null or not _terrain.has_coast():
+		return 0.0
+	var inland: float = maxf(_terrain.get_shore_distance(at), 0.0)
+	return 1.0 - smoothstep(0.0, surf_fade_distance, inland)
+
+
 func _process(delta: float) -> void:
 	var hour: float = 16.0
 	if _game != null:
@@ -76,6 +104,9 @@ func _process(delta: float) -> void:
 	var day: float = day_weight(hour)
 	_apply_bed(_day, 0.0 if beds_muted else day, day_volume_db)
 	_apply_bed(_night, 0.0 if beds_muted else 1.0 - day, night_volume_db)
+	var around: Vector3 = _focus.global_position if _focus != null else global_position
+	var surf: float = surf_weight(Vector2(around.x, around.z))
+	_apply_bed(_surf, 0.0 if beds_muted else surf, surf_volume_db)
 
 	_next_gust_in -= delta
 	if _next_gust_in <= 0.0:

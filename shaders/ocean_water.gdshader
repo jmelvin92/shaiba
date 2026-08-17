@@ -32,7 +32,7 @@ uniform vec3 foam_color : source_color = vec3(0.949, 0.906, 0.812);
 // Peak amplitude of the wave sum, metres. Must stay under the clearance
 // between sea level and the lowest inland desert hollow (see TerrainSettings
 // sea_level) so a crest can never lap into a dry basin.
-uniform float wave_amplitude = 0.09;
+uniform float wave_amplitude = 0.12;
 uniform float wave_speed = 0.9;
 // Direction the swell travels (toward the shore). The coast lies west, so
 // waves run +X; the Ocean node keeps this pointed sensibly.
@@ -43,13 +43,13 @@ uniform float wave_fade_end = 290.0;
 
 // Optical thickness, metres along the view ray, at which the water color has
 // mostly saturated toward deep_color / full opacity.
-uniform float murk_depth = 4.5;
+uniform float murk_depth = 3.2;
 uniform float opaque_depth = 11.0;
-uniform float shallow_alpha = 0.30;
+uniform float shallow_alpha = 0.45;
 uniform float deep_alpha = 0.94;
 
 // Contact foam: view-space thickness below which the water froths white.
-uniform float foam_thickness = 0.9;
+uniform float foam_thickness = 0.55;
 // Rolling foam lines: spacing between bands (in thickness metres), their
 // shoreward speed (bands per second), and the thickness beyond which they
 // fade out — they only live near the shore.
@@ -122,10 +122,10 @@ void fragment() {
 	float roll_phase = fract((thickness + warp) / roll_spacing + TIME * roll_speed);
 	float roll_line = pow(0.5 + 0.5 * sin(roll_phase * TAU), 6.0);
 	float roll = roll_line * roll_strength * (1.0 - smoothstep(roll_reach * 0.4, roll_reach, thickness));
-	float froth = 0.72 + 0.28 * value_noise(world_pos.xz * 1.7 + vec2(TIME * 0.35, -TIME * 0.22));
-	float foam = clamp((contact + roll) * froth, 0.0, 1.0);
+	float froth = 0.62 + 0.38 * value_noise(world_pos.xz * 1.7 + vec2(TIME * 0.35, -TIME * 0.22));
+	float foam = clamp((contact * 0.85 + roll) * froth, 0.0, 1.0);
 	albedo = mix(albedo, foam_color, foam);
-	alpha = clamp(alpha + foam * 0.75, 0.0, 0.96);
+	alpha = clamp(alpha + foam * 0.6, 0.0, 0.96);
 
 	// Fresnel: grazing water reads more like a surface, less like a window.
 	vec3 facet = normalize(cross(dFdy(VERTEX), dFdx(VERTEX)));

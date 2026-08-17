@@ -46,6 +46,9 @@ class Stamp:
 	var strength: float
 	var angle: float
 	var stretch: float
+	## How wet the sand was where this stamp landed, 0 dry to 1 soaked —
+	## resolved from the terrain at stamp time, never carried by the signal.
+	var wetness: float
 
 
 @export_group("Region")
@@ -71,6 +74,11 @@ class Stamp:
 @export_range(30.0, 600.0, 5.0) var fade_seconds: float = 180.0
 ## Metres the accumulated prints migrate downwind per minute while fading.
 @export_range(0.0, 5.0, 0.1) var wind_drift_per_minute: float = 0.5
+## How fast wet-sand prints decay relative to dry ones (Phase 6.7: the beach's
+## swash band remembers). 0.3 = a soaked print outlives a dry one three-fold;
+## the wetness rides the deformation texture's G channel — the per-material
+## decay-class slot the Phase 5 biome contract reserved.
+@export_range(0.05, 1.0, 0.05) var wet_fade_scale: float = 0.3
 ## Update-rate cap for stamp/recentre passes.
 @export_range(1.0, 30.0, 0.5) var max_update_hz: float = 12.0
 
@@ -109,6 +117,9 @@ var _wind_direction: Vector2 = Vector2.ZERO
 var _wind_carry: Vector2 = Vector2.ZERO
 var _stamp_texture: GradientTexture2D
 var _stamp_material: CanvasItemMaterial
+## Terrain query source for per-stamp wetness. Null (no coast, isolation
+## harnesses) means every stamp is dry — exactly the pre-coast behaviour.
+var _terrain: TerrainSettings = null
 
 
 func _ready() -> void:
@@ -119,6 +130,8 @@ func _ready() -> void:
 		_build_viewport()
 	_copy_materials[0].set_shader_parameter("prev_map", _viewports[1].get_texture())
 	_copy_materials[1].set_shader_parameter("prev_map", _viewports[0].get_texture())
+	for copy: ShaderMaterial in _copy_materials:
+		copy.set_shader_parameter("wet_decay_scale", wet_fade_scale)
 
 	var shadow: Color = (load(
 		"res://resources/palette/sand_shadow.tres"
@@ -146,9 +159,11 @@ func _exit_tree() -> void:
 
 
 ## Called by the owning level: rescales the vertex-alpha depth cap from the
-## colour ramp's normalisation to this rig's [member print_full_depth], and
-## reads the wind direction the drift leans with.
+## colour ramp's normalisation to this rig's [member print_full_depth], reads
+## the wind direction the drift leans with, and keeps the terrain for
+## resolving how wet the sand is under each stamp.
 func set_terrain(terrain: TerrainSettings) -> void:
+	_terrain = terrain
 	_terrain_material.set_shader_parameter(
 		"deform_cap_scale", terrain.tone_full_depth / print_full_depth
 	)
@@ -179,6 +194,7 @@ func stamp(
 	entry.strength = strength
 	entry.angle = angle
 	entry.stretch = stretch
+	entry.wetness = 0.0 if _terrain == null else _terrain.get_wetness(world_xz)
 	_pending.append(entry)
 
 
@@ -261,7 +277,11 @@ func _run_pass() -> void:
 		sprite.rotation = entry.angle
 		var base: float = entry.radius * 2.0 * px_per_m / float(STAMP_TEXTURE_SIZE)
 		sprite.scale = Vector2(base * entry.stretch, base)
-		sprite.modulate = Color(entry.strength, entry.strength, entry.strength, 1.0)
+		# R carries the press, G carries press × wetness — so G/R *is* the
+		# wetness, which the copy shader reads as the decay class.
+		sprite.modulate = Color(
+			entry.strength, entry.strength * entry.wetness, 0.0, 1.0
+		)
 		stamps.add_child(sprite)
 	if not _pending.is_empty():
 		_content_until = _time + fade_seconds

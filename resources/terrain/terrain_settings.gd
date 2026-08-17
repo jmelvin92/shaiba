@@ -302,7 +302,11 @@ func _shore_x(world_z: float) -> float:
 ## d = 0 by construction (both end exactly at sea_level there).
 func _coast_surface_target(d: float, raw_base: float) -> float:
 	if d >= 0.0:
-		return sea_level + beach_rise * pow(clampf(d / beach_width, 0.0, 1.0), 1.4)
+		# The linear term gives the waterline a real slope (~1:45), which is
+		# what bounds the swash: with a dead-flat start the visual waves washed
+		# 15+ m up the beach and pooled between humps.
+		var t: float = clampf(d / beach_width, 0.0, 1.0)
+		return sea_level + beach_rise * (0.35 * t + 0.65 * pow(t, 1.6))
 	var out: float = -d
 	var drop: float = seabed_shelf_depth * smoothstep(0.0, seabed_shelf_distance, out) + (
 		seabed_deep_depth - seabed_shelf_depth
@@ -375,7 +379,16 @@ func _raw_base_height(world_xz: Vector2) -> float:
 	# on the profile — and on sea level right at the waterline.
 	var w: float = 1.0 - smoothstep(0.0, beach_width, d)
 	var target: float = _coast_surface_target(d, raw) - _coast_sand_target(d, world_xz)
-	return lerpf(raw, target, w)
+	var blended: float = lerpf(raw, target, w)
+	if d <= 0.0:
+		return blended
+	# Dry means dry: a guaranteed floor keeps every beach point more than a
+	# wave's amplitude above sea level once past the swash, so the water plane
+	# can never pool in a blended-in desert hollow up the beach. (Seen as pale
+	# sheets on the night beach before this existed.) The floor is a *surface*
+	# guarantee, so the base floor subtracts the sand that will sit on it.
+	var dry_floor: float = sea_level + 0.25 * smoothstep(0.0, 8.0, d)
+	return maxf(blended, dry_floor - _coast_sand_target(d, world_xz))
 
 
 func _raw_sand_depth(world_xz: Vector2) -> float:
@@ -399,6 +412,13 @@ func _raw_sand_depth(world_xz: Vector2) -> float:
 	var raw_base: float = base_amplitude * base_noise.get_noise_2d(world_xz.x, world_xz.y)
 	var allowed: float = maxf(_coast_ceiling(d) - raw_base, 0.0)
 	depth = maxf(_smin(depth, allowed, COAST_SMIN_K), 0.0)
+	# A beach is deep sand even where the dunes have given way: hold the sand
+	# up to the coast target across the whole beach, fading out over the
+	# coastal flat — full footprints on the entire beach, not just the swash.
+	var beach_floor: float = _coast_sand_target(d, world_xz) * (
+		1.0 - smoothstep(0.0, beach_width * 2.5, maxf(d, 0.0))
+	)
+	depth = maxf(depth, beach_floor)
 	if d < beach_width:
 		var w: float = 1.0 - smoothstep(0.0, beach_width, d)
 		depth = lerpf(depth, _coast_sand_target(d, world_xz), w)
@@ -537,4 +557,4 @@ func get_surface_tone(world_xz: Vector2) -> float:
 		return lerpf(tone, 0.04, wet * 0.9)
 	# Underwater: pale sand in the wading shallows, darkening with true water
 	# depth so the deep already reads deep from above.
-	return lerpf(0.3, 0.0, smoothstep(0.3, 7.0, sea_level - height))
+	return lerpf(0.55, 0.0, smoothstep(0.4, 8.0, sea_level - height))

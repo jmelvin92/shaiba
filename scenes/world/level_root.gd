@@ -87,6 +87,8 @@ func _ready() -> void:
 	if ocean != null:
 		ocean.set_terrain(terrain)
 		ocean.set_focus(player)
+	if ambience != null:
+		ambience.set_terrain(terrain)
 
 	# The homestead goes onto the pad the terrain levelled for it, and the
 	# player starts in its courtyard — so the game opens looking at the one
