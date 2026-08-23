@@ -15,11 +15,14 @@ uniform float decay_amount = 0.0;
 // wet the print was when stamped. Wet prints decay at this fraction of the
 // dry rate, and G scales with R so the class survives every pass unchanged.
 uniform float wet_decay_scale = 0.3;
-// Raised sand (Phase 6.8): B carries the sand worm's mound, which settles far
-// faster than prints refill — a churned heap slumps in seconds. decay_amount
-// is normalised to the print fade time, so this is fade_seconds over the
-// mound's own settle time (kept current by SandDeformation).
-uniform float mound_decay_scale = 30.0;
+// Raised sand (Phase 6.8): B carries the sand worm's mound, which settles in
+// seconds and decays by its own per-pass amount — NOT decay_amount scaled.
+// The two clocks separate for float16 reasons: at high pass rates the print
+// decay per pass falls below the texture's precision and must be applied in
+// accumulated quanta (SandDeformation carries the remainder), while the
+// mound's much larger per-pass decay stays continuous so its collapse never
+// steps.
+uniform float mound_decay_amount = 0.0;
 
 void fragment() {
 	vec2 uv = UV + uv_shift;
@@ -29,6 +32,6 @@ void fragment() {
 	}
 	float wet = carried.r > 0.0005 ? clamp(carried.g / carried.r, 0.0, 1.0) : 0.0;
 	float pressed = max(carried.r - decay_amount * mix(1.0, wet_decay_scale, wet), 0.0);
-	float raised = max(carried.b - decay_amount * mound_decay_scale, 0.0);
+	float raised = max(carried.b - mound_decay_amount, 0.0);
 	COLOR = vec4(pressed, wet * pressed, raised, 1.0);
 }

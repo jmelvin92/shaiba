@@ -24,10 +24,10 @@ extends Node3D
 ## Steering aims to keep this much slack on every constraint (~0.2 m of
 ## extra sand depth or 2 m of extra distance): the worm starts avoiding
 ## trouble well before the legal line, so its turn arcs never cross it.
-const COMFORT_MARGIN: float = 2.0
+const COMFORT_MARGIN: float = 3.0
 ## A summon spot must be this comfortable — placement into a cramped pocket
 ## is what forces grazing escapes.
-const SUMMON_MARGIN: float = 3.0
+const SUMMON_MARGIN: float = 4.0
 
 ## --- Rig constants, mirrored from tools/build_worm.py (change one, change
 ## both). The body model rests along +Z in Godot space: mouth rim at the
@@ -56,7 +56,7 @@ enum Mode { WANDER, ORBIT, APPROACH }
 @export_group("Swimming")
 ## Cruise speed through the sand, metres per second. Faster than the player
 ## runs (4.9) — being outrun is not what makes the worm survivable.
-@export_range(0.5, 15.0, 0.1) var swim_speed: float = 5.5
+@export_range(0.5, 15.0, 0.1) var swim_speed: float = 7.5
 ## How fast the worm can turn, degrees per second. Low values make the long
 ## body believable: it carves arcs, never pivots.
 @export_range(10.0, 180.0, 1.0) var turn_rate_degrees: float = 55.0
@@ -67,10 +67,11 @@ enum Mode { WANDER, ORBIT, APPROACH }
 ## stays modest: the worm needs *some* sand to heave, not a body's worth).
 @export_range(0.2, 5.0, 0.1) var swim_depth: float = 2.5
 ## Steering probe distance, metres — how far ahead a candidate heading is
-## tested for swimmable sand. Must comfortably exceed the turn radius
-## (swim_speed / turn rate, ~5.7 m at the defaults): the worm commits to
-## arcs, so it has to see trouble at least a full turn before reaching it.
-@export_range(2.0, 30.0, 0.5) var lookahead: float = 10.0
+## tested for swimmable sand. Must exceed a full U-turn's sweep (2 × the
+## ~7.8 m turn radius at the defaults): the worm commits to arcs, so it has
+## to see trouble a whole escape turn before reaching it. Scale this and the
+## margins whenever swim_speed rises.
+@export_range(2.0, 30.0, 0.5) var lookahead: float = 17.0
 
 @export_group("Guardrails")
 ## Minimum local sand depth the worm will swim into, metres. Keeps it inside
@@ -78,9 +79,9 @@ enum Mode { WANDER, ORBIT, APPROACH }
 ## plausibly fit.
 @export_range(0.1, 2.0, 0.05) var min_swim_depth: float = 0.5
 ## Closest the worm may come to the waterline, metres inland. Sized above a
-## full U-turn's sweep (2 × the ~5.7 m turn radius): steering rejects a
+## full U-turn's sweep (2 × the ~7.8 m turn radius): steering rejects a
 ## heading before this line, but the arc it turns away on still eats sand.
-@export_range(0.0, 40.0, 0.5) var shore_margin: float = 14.0
+@export_range(0.0, 40.0, 0.5) var shore_margin: float = 18.0
 ## Clearance kept beyond the homestead pad's blended edge, metres.
 @export_range(0.0, 40.0, 0.5) var homestead_margin: float = 6.0
 
@@ -92,7 +93,7 @@ enum Mode { WANDER, ORBIT, APPROACH }
 @export_range(0.0, 1.0, 0.05) var mound_strength: float = 1.0
 ## Metres of travel between wake marks — the travel gate, applied from day
 ## one (the FootstepStamper min_step_distance lesson).
-@export_range(0.2, 4.0, 0.05) var mound_spacing: float = 1.5
+@export_range(0.2, 4.0, 0.05) var mound_spacing: float = 0.8
 ## Elongation of each mark along the direction of travel.
 @export_range(1.0, 3.0, 0.05) var mound_stretch: float = 1.5
 
@@ -612,7 +613,7 @@ func _steer(desired: float) -> float:
 func _path_margin(heading: float) -> float:
 	var direction: Vector2 = Vector2.from_angle(heading)
 	var worst: float = INF
-	for fraction: float in [0.2, 0.4, 0.6, 0.8, 1.0]:
+	for fraction: float in [0.15, 0.3, 0.5, 0.7, 0.85, 1.0]:
 		worst = minf(worst, _swim_margin(_xz() + direction * (lookahead * fraction)))
 	return worst
 

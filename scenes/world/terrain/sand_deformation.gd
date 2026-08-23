@@ -34,6 +34,19 @@ extends Node3D
 
 ## Passes per second while only decay is pending (no stamps, no recentre).
 const DECAY_HZ: float = 4.0
+## Passes per second while a mound is still settling (Phase 6.8). Prints
+## fade over minutes, where 4 Hz is invisible; the worm's wake collapses in
+## ~1.4 s, and at 4 Hz that collapse visibly steps — the "laggy dune". Mound
+## content is rare and short-lived, so the higher rate costs nothing most of
+## the time.
+const MOUND_DECAY_HZ: float = 24.0
+## Print decay is applied in quanta at least this large. The texture is
+## float16: near a full print, one ULP is ~0.001, and a high pass rate makes
+## the per-pass decay smaller than that — subtracted raw it rounds into
+## visible extra loss (caught by verify_prints' recentre check when the pass
+## rate doubled). The remainder is carried on the CPU, so total decay stays
+## exact; prints fade over minutes, so chunked application is invisible.
+const PRINT_DECAY_QUANTUM: float = 0.004
 ## Pixel size of the radial stamp brush texture.
 const STAMP_TEXTURE_SIZE: int = 64
 
@@ -82,8 +95,11 @@ class Stamp:
 ## the wetness rides the deformation texture's G channel — the per-material
 ## decay-class slot the Phase 5 biome contract reserved.
 @export_range(0.05, 1.0, 0.05) var wet_fade_scale: float = 0.3
-## Update-rate cap for stamp/recentre passes.
-@export_range(1.0, 30.0, 0.5) var max_update_hz: float = 12.0
+## Update-rate cap for stamp/recentre passes. Footsteps arrive well under
+## it either way; the worm's wake stamps at ~9/s and its leading edge renders
+## at this rate, so it sits above that (raised 12 → 24 with MOUND_DECAY_HZ,
+## same "laggy dune" fix).
+@export_range(1.0, 30.0, 0.5) var max_update_hz: float = 24.0
 
 @export_group("Mounds")
 ## Lift of fully raised sand in metres (Phase 6.8: the worm's traveling
@@ -126,6 +142,11 @@ var _last_pass: float = 0.0
 var _last_pass_frame: int = -1
 ## While _time is below this, prints may still be fading and decay passes run.
 var _content_until: float = -1.0
+## While _time is below this, a mound is still settling and decay passes run
+## at MOUND_DECAY_HZ instead of the print rate.
+var _mound_until: float = -1.0
+## Print decay accumulated but not yet applied (see PRINT_DECAY_QUANTUM).
+var _decay_carry: float = 0.0
 ## Downwind unit direction in world xz, from the terrain's wind yaw.
 var _wind_direction: Vector2 = Vector2.ZERO
 ## Sub-texel wind displacement carried until it amounts to a whole texel.
@@ -153,11 +174,6 @@ func _ready() -> void:
 	_copy_materials[1].set_shader_parameter("prev_map", _viewports[0].get_texture())
 	for copy: ShaderMaterial in _copy_materials:
 		copy.set_shader_parameter("wet_decay_scale", wet_fade_scale)
-		# decay_amount is normalised to the print fade time, so the mound's
-		# faster settle is expressed as a multiple of it.
-		copy.set_shader_parameter(
-			"mound_decay_scale", fade_seconds / mound_settle_seconds
-		)
 
 	var shadow: Color = (load(
 		"res://resources/palette/sand_shadow.tres"
@@ -270,7 +286,9 @@ func _physics_process(delta: float) -> void:
 	if not _pending.is_empty() or _needs_recenter():
 		if since_pass >= 1.0 / max_update_hz:
 			_run_pass()
-	elif _time < _content_until and since_pass >= 1.0 / DECAY_HZ:
+	elif _time < _content_until and since_pass >= 1.0 / (
+		MOUND_DECAY_HZ if _time < _mound_until else DECAY_HZ
+	):
 		_run_pass()
 
 
@@ -308,12 +326,22 @@ func _run_pass() -> void:
 
 	var copy: ShaderMaterial = _copy_materials[write]
 	var uv_shift: Vector2 = (new_origin - _origin - wind_step) / region_size
+	# Print decay applies in float16-safe quanta (the carry keeps the total
+	# exact); the mound's own decay is large enough to stay continuous.
+	_decay_carry += elapsed / fade_seconds
+	var print_decay: float = 0.0
+	if _decay_carry >= PRINT_DECAY_QUANTUM:
+		print_decay = _decay_carry
+		_decay_carry = 0.0
 	if debug_log:
 		print("[sand] pass %d: shift %s decay %.4f pending %d" % [
-			passes_run, uv_shift, elapsed / fade_seconds, _pending.size(),
+			passes_run, uv_shift, print_decay, _pending.size(),
 		])
 	copy.set_shader_parameter("uv_shift", uv_shift)
-	copy.set_shader_parameter("decay_amount", elapsed / fade_seconds)
+	copy.set_shader_parameter("decay_amount", print_decay)
+	copy.set_shader_parameter(
+		"mound_decay_amount", elapsed / mound_settle_seconds
+	)
 
 	var stamps: Node2D = _stamp_roots[write]
 	for child: Node in stamps.get_children():
@@ -337,7 +365,11 @@ func _run_pass() -> void:
 		stamps.add_child(sprite)
 	for entry: Stamp in _pending:
 		# Mound-only content settles in seconds; keep decay passes running no
-		# longer than the longest-lived mark actually pending.
+		# longer than the longest-lived mark actually pending — and remember
+		# how long a mound is live, because its collapse renders at the fast
+		# rate.
+		if entry.raised:
+			_mound_until = maxf(_mound_until, _time + mound_settle_seconds)
 		_content_until = maxf(
 			_content_until,
 			_time + (mound_settle_seconds if entry.raised else fade_seconds)
