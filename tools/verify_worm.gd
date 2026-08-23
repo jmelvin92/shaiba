@@ -28,6 +28,8 @@ const HARD_MIN_SAND: float = 0.30
 
 var _failures: int = 0
 var _marks: Array[Dictionary] = []
+var _swallows: int = 0
+var _hunts_ended: int = 0
 
 
 func _init() -> void:
@@ -71,9 +73,13 @@ func _run() -> void:
 	# verify_prints tests it, everything here runs with drift off.
 	sand.wind_drift_per_minute = 0.0
 	worm.raised.connect(
-		func(at: Vector2, _r: float, _s: float, _a: float, _st: float) -> void:
-			_marks.append({"at": at, "time": Time.get_ticks_msec()})
+		func(at: Vector2, r: float, _s: float, _a: float, _st: float) -> void:
+			_marks.append({"at": at, "radius": r, "time": Time.get_ticks_msec()})
 	)
+	worm.swallowed.connect(
+		func(_prey: Node3D) -> void: _swallows += 1
+	)
+	worm.hunt_ended.connect(func() -> void: _hunts_ended += 1)
 	for _i: int in range(90):
 		await physics_frame
 
@@ -85,6 +91,15 @@ func _run() -> void:
 	await _check_channel_isolation(sand, worm)
 	await _check_guardrails(worm, terrain)
 	await _check_settle_and_idle(sand, worm)
+
+	# --- Part 3: the threat -------------------------------------------------
+	var director: WormDirector = level.find_child(
+		"WormDirector", true, false
+	) as WormDirector
+	await _check_director_gating(director, terrain, player)
+	await _check_hunt_cycle(director, worm, terrain, player)
+	await _check_safe_ground(director, worm, terrain)
+	await _check_kill_and_reload(level, director, worm, terrain, player)
 
 	print("pass cost: worst %.3f ms over %d passes" % [
 		sand.worst_pass_ms, sand.passes_run
@@ -381,3 +396,304 @@ func _check_settle_and_idle(sand: SandDeformation, worm: SandWorm) -> void:
 		"no passes run once the mound has settled",
 		"%d passes appeared" % (sand.passes_run - passes_before)
 	)
+
+
+## A patch of sand deep enough to carry noise and swim in, at least min_from
+## and at most max_from metres from `near`, clear of the sea and the
+## homestead keep-out. Vector2.INF when the scan finds nothing.
+func _find_deep_sand(
+	terrain: TerrainSettings, near: Vector2,
+	min_from: float = 40.0, max_from: float = 90.0
+) -> Vector2:
+	var keep_out: float = (
+		terrain.homestead_radius + terrain.homestead_blend + 12.0
+	)
+	var radius: float = min_from
+	while radius <= max_from:
+		for i: int in range(24):
+			var at: Vector2 = near + Vector2.RIGHT.rotated(
+				TAU * float(i) / 24.0
+			) * radius
+			if (
+				terrain.get_sand_depth(at) >= 0.8
+				and terrain.get_shore_distance(at) > 40.0
+				and at.distance_to(terrain.get_homestead_center()) > keep_out
+			):
+				return at
+		radius += 8.0
+	return Vector2.INF
+
+
+## Part 3: the director exists, is wired to the player's noise, and packed
+## ground never charges the meter — the courtyard is silent to the worm.
+func _check_director_gating(
+	director: WormDirector, terrain: TerrainSettings, player: Player
+) -> void:
+	_check(director != null, "the world wires a WormDirector")
+	if director == null:
+		return
+	_check(
+		player.noise_made.is_connected(director.hear_noise),
+		"player noise is connected to the director"
+	)
+	director.clear_calm()
+	var pad: Vector2 = terrain.get_homestead_center()
+	for _i: int in range(60):
+		director.hear_noise(Vector3(pad.x, 0.0, pad.y), 1.0)
+	_check(
+		director.get_attraction() == 0.0,
+		"noise on packed ground never carries",
+		"attraction %.1f after 60 loud steps on the pad" % director.get_attraction()
+	)
+
+
+## Part 3: the full hunt cycle without a kill — sustained noise wakes the
+## worm far away; fresh noise escalates seek → stalk → strike; the strike
+## erupts its telegraph at the committed point and misses the distant
+## player; silence then winds the hunt down to departure and despawn.
+func _check_hunt_cycle(
+	director: WormDirector, worm: SandWorm,
+	terrain: TerrainSettings, player: Player
+) -> void:
+	if director == null:
+		return
+	var player_xz: Vector2 = Vector2(
+		player.global_position.x, player.global_position.z
+	)
+	var deep: Vector2 = _find_deep_sand(terrain, player_xz)
+	_check(deep != Vector2.INF, "deep sand exists within noise range of spawn")
+	if deep == Vector2.INF:
+		return
+	var deep3: Vector3 = Vector3(deep.x, 0.0, deep.y)
+
+	director.clear_calm()
+	var events: int = 0
+	while not worm.is_active() and events < 2000:
+		events += 1
+		director.hear_noise(deep3, 1.0)
+	_check(
+		worm.is_active() and worm.is_hunting(),
+		"accumulated noise wakes the worm hunting",
+		"%d noise events" % events
+	)
+	if not worm.is_hunting():
+		return
+	_check(
+		events >= 100, "waking takes sustained noise, not a stray step",
+		"woke after only %d events" % events
+	)
+	_check(
+		worm.get_hunt_state() == SandWorm.HuntState.SEEK,
+		"the hunt opens seeking the heard point"
+	)
+	var spawn_away: float = Vector2(
+		worm.global_position.x, worm.global_position.z
+	).distance_to(deep)
+	_check(
+		spawn_away >= worm.hunt_spawn_distance * 0.7,
+		"the woken worm enters the world far from the noise",
+		"spawned %.0f m away (spawn distance %.0f)" % [
+			spawn_away, worm.hunt_spawn_distance
+		]
+	)
+
+	# Feed fresh noise at the deep point until the strike commits. The
+	# player is 40+ m away the whole time — this strike must miss.
+	var swallows_before: int = _swallows
+	_marks.clear()
+	Engine.time_scale = 8.0
+	var reached_stalk: bool = false
+	var reached_strike: bool = false
+	var ticks: int = 0
+	while ticks < 60 * 120 and not reached_strike:
+		if ticks % 10 == 0:
+			director.hear_noise(deep3, 1.0)
+		await physics_frame
+		ticks += 1
+		match worm.get_hunt_state():
+			SandWorm.HuntState.STALK:
+				reached_stalk = true
+			SandWorm.HuntState.STRIKE:
+				reached_stalk = true
+				reached_strike = true
+			_:
+				pass
+	_check(reached_stalk, "fresh noise escalates the hunt to a stalk")
+	_check(reached_strike, "a tightened stalk commits to a strike")
+
+	# The strike resolves on its own; total silence from here.
+	var guard: int = 0
+	while (
+		worm.is_hunting()
+		and worm.get_hunt_state() == SandWorm.HuntState.STRIKE
+		and guard < 60 * 60
+	):
+		await physics_frame
+		guard += 1
+	if reached_strike:
+		var telegraphed: bool = false
+		for mark: Dictionary in _marks:
+			if (
+				(mark["radius"] as float) < worm.mound_radius * 0.9
+				and (mark["at"] as Vector2).distance_to(deep) < 4.5
+			):
+				telegraphed = true
+				break
+		_check(
+			telegraphed,
+			"the telegraph churns the sand at the committed point"
+		)
+	_check(
+		_swallows == swallows_before,
+		"a strike at the heard point misses the distant player",
+		"swallowed from %.0f m away" % deep.distance_to(player_xz)
+	)
+
+	guard = 0
+	while worm.is_active() and guard < 60 * 150:
+		await physics_frame
+		guard += 1
+	Engine.time_scale = 1.0
+	_check(
+		not worm.is_active(),
+		"silence winds the hunt down to departure and despawn"
+	)
+	_check(_hunts_ended >= 1, "hunt_ended fires for the director")
+	_check(
+		director.get_calm_left() > 0.0,
+		"the director enters its calm window after the hunt"
+	)
+	director.clear_calm()
+
+
+## Part 3: prey standing inside the homestead keep-out can be heard (if its
+## sand carries) but never struck — the commit's swimmable-target guard is
+## the safe-ground rule made mechanical.
+func _check_safe_ground(
+	director: WormDirector, worm: SandWorm, terrain: TerrainSettings
+) -> void:
+	if worm.is_active():
+		worm.dismiss()
+	if director != null:
+		director.clear_calm()
+	var centre: Vector2 = terrain.get_homestead_center()
+	var keep_out: float = (
+		terrain.homestead_radius + terrain.homestead_blend + worm.homestead_margin
+	)
+	# The deepest sand still inside the keep-out ring: the worst legal case
+	# for the guard — noise may even carry from here, yet it is unstrikable.
+	var spot: Vector2 = centre
+	var best_depth: float = -INF
+	for i: int in range(32):
+		var at: Vector2 = centre + Vector2.RIGHT.rotated(
+			TAU * float(i) / 32.0
+		) * (keep_out - 4.0)
+		if terrain.get_sand_depth(at) > best_depth:
+			best_depth = terrain.get_sand_depth(at)
+			spot = at
+	if not worm.hunt(spot):
+		_check(false, "a hunt can start on prey near the homestead")
+		return
+	Engine.time_scale = 8.0
+	var struck: bool = false
+	var entered: float = INF
+	for tick: int in range(60 * 60):
+		if tick % 10 == 0:
+			worm.hear(spot, 1.0)
+		await physics_frame
+		if not worm.is_active():
+			break
+		if worm.get_hunt_state() == SandWorm.HuntState.STRIKE:
+			struck = true
+			break
+		entered = minf(entered, Vector2(
+			worm.global_position.x, worm.global_position.z
+		).distance_to(centre))
+	Engine.time_scale = 1.0
+	_check(
+		not struck, "prey on safe ground is never struck",
+		"strike committed at sand depth %.2f m inside the keep-out" % best_depth
+	)
+	_check(
+		entered >= keep_out - worm.homestead_margin,
+		"the stalk keeps off the pad while circling safe prey",
+		"came within %.1f m of the centre" % entered
+	)
+	worm.dismiss()
+	if director != null:
+		director.clear_calm()
+
+
+## Part 3: the kill and what death means — a stationary prey on deep sand
+## is swallowed, control is cut, and the death sequence brings the player
+## back (reload or respawn) with control restored and the fade cleared.
+func _check_kill_and_reload(
+	level: Node3D, director: WormDirector, worm: SandWorm,
+	terrain: TerrainSettings, player: Player
+) -> void:
+	var fade: ScreenFade = level.find_child("ScreenFade", true, false) as ScreenFade
+	_check(fade != null, "the world has a ScreenFade")
+	if director != null:
+		director.clear_calm()
+	var player_xz: Vector2 = Vector2(
+		player.global_position.x, player.global_position.z
+	)
+	var deep: Vector2 = _find_deep_sand(terrain, player_xz)
+	if deep == Vector2.INF:
+		_check(false, "deep sand for the kill check")
+		return
+	player.global_position = Vector3(
+		deep.x, terrain.get_surface_height(deep) + 0.1, deep.y
+	)
+	player.reset_physics_interpolation()
+	for _i: int in range(30):
+		await physics_frame
+
+	var spawn_before: float = worm.hunt_spawn_distance
+	worm.hunt_spawn_distance = 45.0
+	var swallows_before: int = _swallows
+	if not worm.hunt(deep):
+		_check(false, "a hunt can start for the kill check")
+		worm.hunt_spawn_distance = spawn_before
+		return
+	Engine.time_scale = 6.0
+	var ticks: int = 0
+	while _swallows == swallows_before and ticks < 60 * 120:
+		if ticks % 10 == 0:
+			worm.hear(Vector2(
+				player.global_position.x, player.global_position.z
+			), 1.0)
+		await physics_frame
+		ticks += 1
+	Engine.time_scale = 1.0
+	worm.hunt_spawn_distance = spawn_before
+	_check(
+		_swallows == swallows_before + 1,
+		"a strike onto stationary prey swallows it",
+		"no bite in %d ticks" % ticks
+	)
+	if _swallows != swallows_before + 1:
+		worm.dismiss()
+		return
+	_check(
+		not player.is_control_enabled(), "the swallow cuts player control"
+	)
+	var guard: int = 0
+	while not player.is_control_enabled() and guard < 60 * 20:
+		await physics_frame
+		guard += 1
+	_check(
+		player.is_control_enabled(),
+		"the death sequence completes and control returns"
+	)
+	guard = 0
+	while fade != null and fade.is_black() and guard < 60 * 5:
+		await physics_frame
+		guard += 1
+	_check(
+		fade == null or not fade.is_black(),
+		"the screen fades back in after the reload"
+	)
+	_check(not worm.is_active(), "the worm is gone after the kill")
+	if director != null:
+		director.clear_calm()

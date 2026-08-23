@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="Script" path="res://scenes/world/level_root.gd" id="1_level"]
 [ext_resource type="PackedScene" path="res://scenes/world/desert_environment.tscn" id="2_env"]
@@ -15,6 +15,8 @@
 [ext_resource type="Script" path="res://scenes/world/save_system.gd" id="13_save"]
 [ext_resource type="PackedScene" path="res://scenes/world/ocean/ocean.tscn" id="14_ocean"]
 [ext_resource type="PackedScene" path="res://scenes/props/sand_worm/sand_worm.tscn" id="15_worm"]
+[ext_resource type="Script" path="res://scenes/world/worm_director.gd" id="16_director"]
+[ext_resource type="PackedScene" path="res://scenes/ui/screen_fade/screen_fade.tscn" id="17_fade"]
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_level")
@@ -42,9 +44,14 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
 
 [node name="SandWorm" parent="." instance=ExtResource("15_worm")]
 
+[node name="WormDirector" type="Node" parent="."]
+script = ExtResource("16_director")
+
 [node name="Ambience" parent="." instance=ExtResource("10_ambience")]
 
 [node name="Music" parent="." instance=ExtResource("11_music")]
+
+[node name="ScreenFade" parent="." instance=ExtResource("17_fade")]
 
 [node name="PauseMenu" parent="." instance=ExtResource("12_pause")]
 

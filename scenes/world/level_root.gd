@@ -37,6 +37,13 @@ extends Node3D
 ## Levels without it skip the wiring; the worm itself stays dormant until
 ## summoned, so its presence costs nothing.
 @export var sand_worm_path: NodePath = ^"SandWorm"
+## Direct child deciding when the worm hunts (Phase 6.8 Part 3). Optional —
+## without it the worm only ever answers the debug keys.
+@export var worm_director_path: NodePath = ^"WormDirector"
+## Direct child fading the screen to black, used by the swallow sequence.
+@export var screen_fade_path: NodePath = ^"ScreenFade"
+## How long the swallow drags the player under before the reload, seconds.
+@export_range(0.3, 3.0, 0.05) var swallow_seconds: float = 1.2
 ## Direct child owning save/load, if this level has one (the graybox doesn't).
 @export var save_system_path: NodePath = ^"SaveSystem"
 ## Direct child holding the pause menu, whose save/load requests the level
@@ -45,6 +52,14 @@ extends Node3D
 
 var _save_system: SaveSystem = null
 var _pause_menu: PauseMenu = null
+## Held for the swallow sequence — set only when the level has all of the
+## pieces (worm, terrain, fade), so the handler can trust them.
+var _player: Player = null
+var _camera_rig: CameraRig = null
+var _terrain: TerrainSettings = null
+var _worm: SandWorm = null
+## True from the bite to the fade-back-in; re-entry is impossible while set.
+var _swallowing: bool = false
 
 
 func _ready() -> void:
@@ -122,6 +137,24 @@ func _ready() -> void:
 		if overlay != null:
 			overlay.set_worm(worm)
 
+		# Part 3: the director hears what the world hears (the player's feet
+		# today; any future noisemaker is the same signal and connect), and
+		# the bite comes back up as one signal the level answers with the
+		# death sequence.
+		var director: WormDirector = (
+			get_node_or_null(worm_director_path) as WormDirector
+		)
+		if director != null:
+			director.setup(worm, terrain, player)
+			player.noise_made.connect(director.hear_noise)
+			if overlay != null:
+				overlay.set_worm_director(director)
+		_player = player
+		_camera_rig = camera_rig
+		_terrain = terrain
+		_worm = worm
+		worm.swallowed.connect(_on_swallowed)
+
 
 ## Moves the homestead onto its levelled pad and the player into its courtyard.
 ##
@@ -145,6 +178,57 @@ func _place_homestead(terrain: TerrainSettings, player: Player) -> void:
 	# so a marker sitting at the homestead's own height can't leave them buried.
 	player.global_position.x = spawn.global_position.x
 	player.global_position.z = spawn.global_position.z
+
+
+## The kill (Phase 6.8 Part 3, Joshua's design): being caught is a cinematic
+## swallow — control cut, dragged under with the diving head, fade to black,
+## reload the last save (or re-seat at the spawn when none exists), fade back
+## in. No health bar; the escape beat happened before the bite ever landed.
+func _on_swallowed(_prey: Node3D) -> void:
+	if _swallowing or _player == null:
+		return
+	_swallowing = true
+	_player.set_control_enabled(false)
+	var fade: ScreenFade = get_node_or_null(screen_fade_path) as ScreenFade
+	if fade != null:
+		# Fire-and-forget: the fade darkens while the drag plays out below.
+		fade.fade_out(swallow_seconds * 0.9)
+
+	# Dragged under: the body rides the mouth as the head dives. Direct
+	# position writes are safe — control-cut players skip their physics.
+	var dragged: float = 0.0
+	while dragged < swallow_seconds:
+		var delta: float = get_physics_process_delta_time()
+		dragged += delta
+		if _worm != null and _worm.is_active():
+			_player.global_position = _player.global_position.lerp(
+				_worm.global_position, 1.0 - exp(-8.0 * delta)
+			)
+		await get_tree().physics_frame
+
+	if _worm != null:
+		_worm.dismiss()
+	if _save_system != null and _save_system.has_save():
+		_save_system.load_game()
+	else:
+		_respawn_at_start()
+	_player.set_control_enabled(true)
+	if _camera_rig != null:
+		_camera_rig.snap_to_target()
+	if fade != null:
+		await fade.fade_in(0.8)
+	_swallowing = false
+
+
+## No save to return to: back to the courtyard, the way a fresh run starts.
+func _respawn_at_start() -> void:
+	if _terrain == null:
+		return
+	_place_homestead(_terrain, _player)
+	var at: Vector2 = Vector2(_player.global_position.x, _player.global_position.z)
+	_player.global_position.y = _terrain.get_surface_height(at) + 0.1
+	_player.velocity = Vector3.ZERO
+	_player.reset_physics_interpolation()
 
 
 func _on_save_requested() -> void:

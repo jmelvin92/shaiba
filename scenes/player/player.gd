@@ -195,6 +195,10 @@ var _water_depth: float = 0.0
 ## How far the mesh is currently lowered to show the feet settling into sand.
 var _sink_offset: float = 0.0
 
+## False while a sequence owns the body (the worm's swallow): input, physics
+## and animation all hold still and the owner moves the node directly.
+var _control_enabled: bool = true
+
 
 func _ready() -> void:
 	add_to_group(SaveSystem.GROUP)
@@ -226,7 +230,23 @@ func set_terrain(terrain: TerrainSettings) -> void:
 	_footsteps.set_terrain(terrain)
 
 
+## Cut or restore the player's agency (the worm's swallow, future cutscenes).
+## While disabled the whole physics tick is skipped, so whoever cut control
+## may move the node directly without fighting gravity or collision.
+func set_control_enabled(enabled: bool) -> void:
+	_control_enabled = enabled
+	if not enabled:
+		velocity = Vector3.ZERO
+		_planar_speed = 0.0
+
+
+func is_control_enabled() -> bool:
+	return _control_enabled
+
+
 func _physics_process(delta: float) -> void:
+	if not _control_enabled:
+		return
 	if _terrain != null:
 		var at: Vector2 = Vector2(global_position.x, global_position.z)
 		_sand_depth = _terrain.get_sand_depth(at)

@@ -97,6 +97,7 @@ exist. Sand works this way.
 |---|---|
 | `worm_rumble_loop.wav` | The sand worm passing underground: a deep, felt-more-than-heard rumble with slow grinding movement in it, seamless loop, mono. It plays from the worm's position — distance and doppler are the engine's job, so the file itself should be close-up and steady. |
 | `worm_breach_01.wav` | The breach (Phase 6.8 Part 2): a huge eruption of sand — deep whump, cascading grain wash, ~2–4 s, mono. Fired once at each surface crossing (burst out, dive back in). |
+| `worm_telegraph_01.wav` | The strike's warning (Part 3): sand starting to boil and hiss at your feet — a rising granular churn, ~1.5–2.5 s, mono. Fired once at the spot the worm has committed to, right as the escape beat begins. This is the sound that saves your life. |
 
 ## Later (do NOT source yet — listed so the plan stays in one place)
 

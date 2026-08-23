@@ -22,10 +22,17 @@ var _shown_worst_ms: float = 0.0
 ## one-line status each update, the worm pushes nothing.
 var _worm: SandWorm = null
 
+## The worm's encounter director (Part 3) — same pull-only arrangement.
+var _worm_director: WormDirector = null
+
 
 ## Called by the owning level's wiring (LevelRoot, down through ChunkManager).
 func set_worm(worm: SandWorm) -> void:
 	_worm = worm
+
+
+func set_worm_director(director: WormDirector) -> void:
+	_worm_director = director
 
 
 ## Called by the owning ChunkManager once per frame while visible.
@@ -53,3 +60,5 @@ func update_stats(
 			_game.clock_text(), _game.day_count, _game.period]
 	if _worm != null:
 		_label.text += "\n" + _worm.get_debug_text()
+	if _worm_director != null:
+		_label.text += "\n" + _worm_director.get_debug_text()
