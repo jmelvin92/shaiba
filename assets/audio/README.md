@@ -90,13 +90,15 @@ exist. Sand works this way.
 | Files | What it should sound like |
 |---|---|
 | `ambient_01..NN.ogg` | Quiet instrumental beds, seamless loops. `ambient_01` loops solo for now; when more land, they become a random rotation with silent gaps between tracks. |
+| `worm_hunt_loop.wav` | ✅ **Sourced 2026-08-23** (KSHMR orchestral drums, 100 BPM, exactly 2 bars — Joshua's pick). The threat score: loops in place of the paused ambient bed for as long as the worm hunts. Kept as wav (bar-exact loop; a crossfade seam would double the downbeat). |
 
 ## creatures/ — the buried things (Phase 6.8)
 
 | Files | What it should sound like |
 |---|---|
 | `worm_rumble_loop.wav` | The sand worm passing underground: a deep, felt-more-than-heard rumble with slow grinding movement in it, seamless loop, mono. It plays from the worm's position — distance and doppler are the engine's job, so the file itself should be close-up and steady. |
-| `worm_breach_01.wav` | The breach (Phase 6.8 Part 2): a huge eruption of sand — deep whump, cascading grain wash, ~2–4 s, mono. Fired once at each surface crossing (burst out, dive back in). |
+| `worm_breach_01.wav` | ✅ **Sourced 2026-08-23** (ESM kraken attack growl, Joshua's pick). The breach: fired once at each surface crossing (burst out, dive back in). |
+| `worm_wake_01.wav` | ✅ **Sourced 2026-08-23** (ESM kraken light growl, Joshua's pick). The threat announcement: plays once, non-positional, the moment a hunt begins — paired with the ambient music pausing and the hunt drums starting (see `music/worm_hunt_loop`). |
 | `worm_telegraph_01.wav` | The strike's warning (Part 3): sand starting to boil and hiss at your feet — a rising granular churn, ~1.5–2.5 s, mono. Fired once at the spot the worm has committed to, right as the escape beat begins. This is the sound that saves your life. |
 
 ## Later (do NOT source yet — listed so the plan stays in one place)

@@ -59,8 +59,14 @@ signal raised(
 ## reports the bite.
 signal swallowed(prey: Node3D)
 
+## A hunt just began — the worm is awake and coming. The threat score hangs
+## off this (LevelRoot connects it to MusicBed): ambient music pauses, the
+## wake growl announces the threat, the hunt drums start.
+signal hunt_started
+
 ## A hunt is over, however it ended — departure, dismissal, or a kill. The
-## WormDirector starts its calm-down cooldown off this.
+## WormDirector starts its calm-down cooldown off this; the threat score
+## stands down off it too.
 signal hunt_ended
 
 ## Debug behaviours for seeing the mound without waiting for it. WANDER
@@ -245,7 +251,9 @@ func _ready() -> void:
 	_drift.seed = 1337
 	_drift.frequency = 0.03
 	# Silent-safe per Phase 6.6: no file, no emitter, no error.
-	var stream: AudioStream = SoundBank.stream("creatures/worm_rumble_loop", true)
+	var stream: AudioStream = SoundBank.stream(
+		"creatures/worm_rumble_loop.ogg", true
+	)
 	if stream != null:
 		_rumble = AudioStreamPlayer3D.new()
 		_rumble.stream = stream
@@ -254,8 +262,10 @@ func _ready() -> void:
 		# Doppler on: a low rumble sweeping past is half the dread.
 		_rumble.doppler_tracking = AudioStreamPlayer3D.DOPPLER_TRACKING_PHYSICS_STEP
 		add_child(_rumble)
-	_breach_sound = SoundBank.stream("creatures/worm_breach_01")
-	_telegraph_sound = SoundBank.stream("creatures/worm_telegraph_01")
+	# (Extensions are part of the name — SoundBank resolves exact paths; the
+	# extensionless originals could never have loaded once files arrived.)
+	_breach_sound = SoundBank.stream("creatures/worm_breach_01.wav")
+	_telegraph_sound = SoundBank.stream("creatures/worm_telegraph_01.wav")
 	_setup_body()
 	_setup_burst()
 
@@ -471,6 +481,7 @@ func hunt(heard_at: Vector2) -> bool:
 			_stalk_radius = stalk_radius_start
 			_strike_misses = 0
 			_swallow_fired = false
+			hunt_started.emit()
 			return true
 	return false
 

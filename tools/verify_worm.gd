@@ -489,6 +489,12 @@ func _check_hunt_cycle(
 		worm.get_hunt_state() == SandWorm.HuntState.SEEK,
 		"the hunt opens seeking the heard point"
 	)
+	var music: MusicBed = root.find_child("Music", true, false) as MusicBed
+	if music != null:
+		_check(
+			music.is_hunt_active(),
+			"the threat score starts with the hunt (ambient paused, drums on)"
+		)
 	var spawn_away: float = Vector2(
 		worm.global_position.x, worm.global_position.z
 	).distance_to(deep)
@@ -561,6 +567,11 @@ func _check_hunt_cycle(
 		not worm.is_active(),
 		"silence winds the hunt down to departure and despawn"
 	)
+	if music != null:
+		_check(
+			not music.is_hunt_active(),
+			"the threat score stands down when the hunt ends"
+		)
 	_check(_hunts_ended >= 1, "hunt_ended fires for the director")
 	_check(
 		director.get_calm_left() > 0.0,

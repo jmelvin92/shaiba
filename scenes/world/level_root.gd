@@ -29,6 +29,9 @@ extends Node3D
 ## Direct child playing the ambient sound bed, if this level has one. Told to
 ## centre its gusts on the player; a level without one skips it.
 @export var ambience_path: NodePath = ^"Ambience"
+## Direct child playing music, if this level has one. Wired to the worm's
+## hunt signals for the threat score; a level without either skips it.
+@export var music_path: NodePath = ^"Music"
 ## Direct child drawing the sea surface, if this level has one. Handed the
 ## terrain (for sea level and the coast switch) and the player to follow; a
 ## level without one — or a coastless world — skips it entirely.
@@ -154,6 +157,14 @@ func _ready() -> void:
 		_terrain = terrain
 		_worm = worm
 		worm.swallowed.connect(_on_swallowed)
+
+		# The threat score (Joshua's design, 2026-08-23): the hunt drives the
+		# music — ambient pauses, growl announces, drums loop, all restored
+		# when the hunt ends however it ends.
+		var music: MusicBed = get_node_or_null(music_path) as MusicBed
+		if music != null:
+			worm.hunt_started.connect(music.set_hunt_active.bind(true))
+			worm.hunt_ended.connect(music.set_hunt_active.bind(false))
 
 
 ## Moves the homestead onto its levelled pad and the player into its courtyard.
