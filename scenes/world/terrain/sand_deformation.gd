@@ -89,7 +89,7 @@ class Stamp:
 ## Lift of fully raised sand in metres (Phase 6.8: the worm's traveling
 ## mound) — scaled down by local sand depth exactly like prints, so hard
 ## ground heaves nothing.
-@export_range(0.0, 1.5, 0.05) var mound_height: float = 0.5
+@export_range(0.0, 1.5, 0.05) var mound_height: float = 0.9
 ## Seconds for a full mound to slump back to flat sand. Short by design: at
 ## worm speed this bounds the visible wake to a dozen metres of collapsing
 ## swell behind the body — longer reads as a built berm wall, not motion.

@@ -48,8 +48,11 @@ enum Mode { WANDER, ORBIT, APPROACH }
 ## body believable: it carves arcs, never pivots.
 @export_range(10.0, 180.0, 1.0) var turn_rate_degrees: float = 55.0
 ## How far below the sand surface the body travels, metres. Part 1 uses it
-## only to place the rumble emitter; Part 2's body inherits it.
-@export_range(0.2, 5.0, 0.1) var swim_depth: float = 1.2
+## only to place the rumble emitter; Part 2's body inherits it. The titan's
+## spine rides deep — it tunnels through the substrate itself, only its bow
+## wave disturbing the sand layer above (which is why [member min_swim_depth]
+## stays modest: the worm needs *some* sand to heave, not a body's worth).
+@export_range(0.2, 5.0, 0.1) var swim_depth: float = 2.5
 ## Steering probe distance, metres — how far ahead a candidate heading is
 ## tested for swimmable sand. Must comfortably exceed the turn radius
 ## (swim_speed / turn rate, ~5.7 m at the defaults): the worm commits to
@@ -69,14 +72,14 @@ enum Mode { WANDER, ORBIT, APPROACH }
 @export_range(0.0, 40.0, 0.5) var homestead_margin: float = 6.0
 
 @export_group("Mound")
-## Radius of one wake mark, metres — sized to the worm, so the size ladder
-## revisits it.
-@export_range(0.2, 6.0, 0.1) var mound_radius: float = 2.4
+## Radius of one wake mark, metres — sized to the picked titan scale
+## (Joshua, 2026-08-22: rung C, 26 m body).
+@export_range(0.2, 6.0, 0.1) var mound_radius: float = 3.8
 ## Strength of a wake mark, 0–1. The shader caps by local sand depth anyway.
 @export_range(0.0, 1.0, 0.05) var mound_strength: float = 1.0
 ## Metres of travel between wake marks — the travel gate, applied from day
 ## one (the FootstepStamper min_step_distance lesson).
-@export_range(0.2, 4.0, 0.05) var mound_spacing: float = 0.9
+@export_range(0.2, 4.0, 0.05) var mound_spacing: float = 1.5
 ## Elongation of each mark along the direction of travel.
 @export_range(1.0, 3.0, 0.05) var mound_stretch: float = 1.5
 
