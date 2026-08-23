@@ -49,6 +49,9 @@ class Stamp:
 	## How wet the sand was where this stamp landed, 0 dry to 1 soaked —
 	## resolved from the terrain at stamp time, never carried by the signal.
 	var wetness: float
+	## True for a raise mark (Phase 6.8): sand heaved up into the texture's B
+	## channel — the worm's mound — instead of pressed into R.
+	var raised: bool = false
 
 
 @export_group("Region")
@@ -81,6 +84,18 @@ class Stamp:
 @export_range(0.05, 1.0, 0.05) var wet_fade_scale: float = 0.3
 ## Update-rate cap for stamp/recentre passes.
 @export_range(1.0, 30.0, 0.5) var max_update_hz: float = 12.0
+
+@export_group("Mounds")
+## Lift of fully raised sand in metres (Phase 6.8: the worm's traveling
+## mound) — scaled down by local sand depth exactly like prints, so hard
+## ground heaves nothing.
+@export_range(0.0, 1.5, 0.05) var mound_height: float = 0.5
+## Seconds for a full mound to slump back to flat sand. Short by design: at
+## worm speed this bounds the visible wake to a dozen metres of collapsing
+## swell behind the body — longer reads as a built berm wall, not motion.
+@export_range(1.0, 60.0, 0.5) var mound_settle_seconds: float = 1.4
+## How strongly fully raised sand darkens toward the churned tint.
+@export_range(0.0, 1.0, 0.05) var mound_tint_strength: float = 0.45
 
 ## Main-thread cost of the last texture pass, ms (scheduling + sprite setup;
 ## the render itself is GPU-side). Read by verify tooling.
@@ -116,6 +131,11 @@ var _wind_direction: Vector2 = Vector2.ZERO
 ## Sub-texel wind displacement carried until it amounts to a whole texel.
 var _wind_carry: Vector2 = Vector2.ZERO
 var _stamp_texture: GradientTexture2D
+## Raise marks use a coreless brush: a print's flat core is what gives a
+## footprint its crisp floor, but overlapping flat cores saturate the mound
+## channel into a plateau whose edges the 1 m terrain mesh renders as blocky
+## terraces. A smooth peak overlaps into a soft-shouldered ridge instead.
+var _raise_texture: GradientTexture2D
 var _stamp_material: CanvasItemMaterial
 ## Terrain query source for per-stamp wetness. Null (no coast, isolation
 ## harnesses) means every stamp is dry — exactly the pre-coast behaviour.
@@ -124,6 +144,7 @@ var _terrain: TerrainSettings = null
 
 func _ready() -> void:
 	_stamp_texture = _build_stamp_texture()
+	_raise_texture = _build_raise_texture()
 	_stamp_material = CanvasItemMaterial.new()
 	_stamp_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	for _i: int in range(2):
@@ -132,6 +153,11 @@ func _ready() -> void:
 	_copy_materials[1].set_shader_parameter("prev_map", _viewports[0].get_texture())
 	for copy: ShaderMaterial in _copy_materials:
 		copy.set_shader_parameter("wet_decay_scale", wet_fade_scale)
+		# decay_amount is normalised to the print fade time, so the mound's
+		# faster settle is expressed as a multiple of it.
+		copy.set_shader_parameter(
+			"mound_decay_scale", fade_seconds / mound_settle_seconds
+		)
 
 	var shadow: Color = (load(
 		"res://resources/palette/sand_shadow.tres"
@@ -146,6 +172,8 @@ func _ready() -> void:
 	_terrain_material.set_shader_parameter("deform_tint_strength", tint_strength)
 	_terrain_material.set_shader_parameter("deform_size", region_size)
 	_terrain_material.set_shader_parameter("deform_strength", max_print_depth)
+	_terrain_material.set_shader_parameter("deform_raise", mound_height)
+	_terrain_material.set_shader_parameter("deform_raise_tint", mound_tint_strength)
 	_terrain_material.set_shader_parameter(
 		"deformation_map", _viewports[_read].get_texture()
 	)
@@ -156,6 +184,7 @@ func _ready() -> void:
 ## graybox and any deformation-free level untouched.
 func _exit_tree() -> void:
 	_terrain_material.set_shader_parameter("deform_strength", 0.0)
+	_terrain_material.set_shader_parameter("deform_raise", 0.0)
 
 
 ## Called by the owning level: rescales the vertex-alpha depth cap from the
@@ -195,6 +224,27 @@ func stamp(
 	entry.angle = angle
 	entry.stretch = stretch
 	entry.wetness = 0.0 if _terrain == null else _terrain.get_wetness(world_xz)
+	_pending.append(entry)
+
+
+## Heave the sand up instead of pressing it down (Phase 6.8): the worm's
+## traveling mound. Same contract as [method stamp] — anything may call it,
+## usually via a raiser signal the level connected — but the mark rides the
+## texture's B channel with its own fast settle, so prints are untouched.
+func raise(
+	world_xz: Vector2,
+	radius: float,
+	strength: float,
+	angle: float = 0.0,
+	stretch: float = 1.0
+) -> void:
+	var entry: Stamp = Stamp.new()
+	entry.at = world_xz
+	entry.radius = radius
+	entry.strength = strength
+	entry.angle = angle
+	entry.stretch = stretch
+	entry.raised = true
 	_pending.append(entry)
 
 
@@ -271,20 +321,27 @@ func _run_pass() -> void:
 	var px_per_m: float = float(texture_size) / region_size
 	for entry: Stamp in _pending:
 		var sprite: Sprite2D = Sprite2D.new()
-		sprite.texture = _stamp_texture
+		sprite.texture = _raise_texture if entry.raised else _stamp_texture
 		sprite.material = _stamp_material
 		sprite.position = (entry.at - new_origin) * px_per_m
 		sprite.rotation = entry.angle
 		var base: float = entry.radius * 2.0 * px_per_m / float(STAMP_TEXTURE_SIZE)
 		sprite.scale = Vector2(base * entry.stretch, base)
 		# R carries the press, G carries press × wetness — so G/R *is* the
-		# wetness, which the copy shader reads as the decay class.
-		sprite.modulate = Color(
-			entry.strength, entry.strength * entry.wetness, 0.0, 1.0
+		# wetness, which the copy shader reads as the decay class. A raise
+		# mark writes B alone: the mound channel, untouched by print math.
+		sprite.modulate = (
+			Color(0.0, 0.0, entry.strength, 1.0) if entry.raised
+			else Color(entry.strength, entry.strength * entry.wetness, 0.0, 1.0)
 		)
 		stamps.add_child(sprite)
-	if not _pending.is_empty():
-		_content_until = _time + fade_seconds
+	for entry: Stamp in _pending:
+		# Mound-only content settles in seconds; keep decay passes running no
+		# longer than the longest-lived mark actually pending.
+		_content_until = maxf(
+			_content_until,
+			_time + (mound_settle_seconds if entry.raised else fade_seconds)
+		)
 	_pending.clear()
 
 	_viewports[write].render_target_update_mode = SubViewport.UPDATE_ONCE
@@ -338,6 +395,22 @@ func _build_viewport() -> void:
 func _build_stamp_texture() -> GradientTexture2D:
 	var gradient: Gradient = Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.35, 1.0])
+	gradient.colors = PackedColorArray([Color.WHITE, Color(1.0, 1.0, 1.0, 0.0)])
+	var texture: GradientTexture2D = GradientTexture2D.new()
+	texture.gradient = gradient
+	texture.fill = GradientTexture2D.FILL_RADIAL
+	texture.fill_from = Vector2(0.5, 0.5)
+	texture.fill_to = Vector2(0.5, 0.0)
+	texture.width = STAMP_TEXTURE_SIZE
+	texture.height = STAMP_TEXTURE_SIZE
+	return texture
+
+
+## The mound brush: same radial fill, but falling from the very centre — see
+## [member _raise_texture] for why raises must not have a flat core.
+func _build_raise_texture() -> GradientTexture2D:
+	var gradient: Gradient = Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 1.0])
 	gradient.colors = PackedColorArray([Color.WHITE, Color(1.0, 1.0, 1.0, 0.0)])
 	var texture: GradientTexture2D = GradientTexture2D.new()
 	texture.gradient = gradient

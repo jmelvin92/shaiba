@@ -51,6 +51,12 @@ var worst_apply_ms: float = 0.0
 @onready var _overlay: TerrainDebugOverlay = get_node_or_null(^"DebugOverlay") as TerrainDebugOverlay
 
 
+## The F3 readout, for the level's wiring to hand extra readers to (the sand
+## worm line). Null on levels without one.
+func get_debug_overlay() -> TerrainDebugOverlay:
+	return _overlay
+
+
 func _ready() -> void:
 	if settings == null:
 		push_warning("ChunkManager: no TerrainSettings assigned; terrain disabled.")

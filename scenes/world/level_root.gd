@@ -33,6 +33,10 @@ extends Node3D
 ## terrain (for sea level and the coast switch) and the player to follow; a
 ## level without one — or a coastless world — skips it entirely.
 @export var ocean_path: NodePath = ^"Ocean"
+## Direct child housing the sand worm, if this level has one (Phase 6.8).
+## Levels without it skip the wiring; the worm itself stays dormant until
+## summoned, so its presence costs nothing.
+@export var sand_worm_path: NodePath = ^"SandWorm"
 ## Direct child owning save/load, if this level has one (the graybox doesn't).
 @export var save_system_path: NodePath = ^"SaveSystem"
 ## Direct child holding the pause menu, whose save/load requests the level
@@ -105,6 +109,18 @@ func _ready() -> void:
 		sand.set_terrain(terrain)
 		sand.set_tracked(player)
 		player.stamped.connect(sand.stamp)
+
+	# The worm reports its wake exactly like the player's feet report steps:
+	# one signal, one connect — the Phase 5 stamper contract, raise flavour.
+	var worm: SandWorm = get_node_or_null(sand_worm_path) as SandWorm
+	if worm != null:
+		worm.set_terrain(terrain)
+		worm.set_focus(player)
+		if sand != null:
+			worm.raised.connect(sand.raise)
+		var overlay: TerrainDebugOverlay = chunk_manager.get_debug_overlay()
+		if overlay != null:
+			overlay.set_worm(worm)
 
 
 ## Moves the homestead onto its levelled pad and the player into its courtyard.

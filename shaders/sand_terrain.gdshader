@@ -21,6 +21,26 @@ uniform vec2 deform_origin = vec2(0.0);
 uniform float deform_size = 1.0;
 uniform float deform_strength = 0.0;
 uniform float deform_tint_strength = 0.55;
+// Raised sand (Phase 6.8): the deformation map's B channel lifts the surface
+// instead of pressing it — the sand worm's traveling mound. Metres at full
+// raise; 0 (the default) keeps the whole path inert, like deform_strength.
+uniform float deform_raise = 0.0;
+// B below this moves nothing: flat shading flips a whole 1 m facet's tone
+// over a few centimetres of lift, so a nearly-settled mound must release the
+// surface completely instead of leaving a facet-noise patchwork behind.
+const float RAISE_FLOOR = 0.12;
+
+float raise_of(float b) {
+	// Soft saturation (x/(1+x)), never a hard clamp: overlapping wake stamps
+	// sum well past 1, and clamping flat turned the mound into a mesa whose
+	// edges the 1 m flat-shaded mesh drew as terraced cliffs.
+	float x = max(b - RAISE_FLOOR, 0.0);
+	return x / (1.0 + x);
+}
+// How strongly fully raised sand darkens toward the churned tint. Freshly
+// heaved sand reads disturbed, not sun-bleached — same ratio as prints, its
+// own strength.
+uniform float deform_raise_tint = 0.35;
 // Multiplicative darkening of a fully pressed print (linear-space colour
 // ratio, sand_shadow / sand_light — set by SandDeformation). Multiplying
 // instead of mixing toward a fixed colour keeps prints visible on every base
@@ -98,22 +118,33 @@ bool in_region(vec2 uv) {
 void vertex() {
 	world_xz = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz;
 	deform_uv = (world_xz - deform_origin) / deform_size;
-	if (deform_strength > 0.0 && in_region(deform_uv)) {
-		float pressed = min(textureLod(deformation_map, deform_uv, 0.0).r, 1.0);
-		VERTEX.y -= pressed * deform_strength * sand_cap(COLOR.a);
+	if ((deform_strength > 0.0 || deform_raise > 0.0) && in_region(deform_uv)) {
+		vec3 marks = textureLod(deformation_map, deform_uv, 0.0).rgb;
+		float pressed = min(marks.r, 1.0);
+		float raised = raise_of(marks.b);
+		// Both directions cap by the sand actually here: hard ground neither
+		// takes a print nor heaves a mound — there is no sand to move.
+		VERTEX.y += (raised * deform_raise - pressed * deform_strength)
+			* sand_cap(COLOR.a);
 	}
 }
 
 void fragment() {
 	vec3 albedo = COLOR.rgb;
 	float pressed = 0.0;
-	if (deform_strength > 0.0 && in_region(deform_uv)) {
+	float raised = 0.0;
+	if ((deform_strength > 0.0 || deform_raise > 0.0) && in_region(deform_uv)) {
 		// Sampled per-pixel, not per-vertex: the darkened compacted-sand tint
 		// is what draws the crisp print shape at the gameplay camera — the
-		// vertex dip underneath is soft at 1 m mesh resolution.
-		pressed = min(texture(deformation_map, deform_uv).r, 1.0);
-		float press_show = pressed * deform_tint_strength * sand_cap(COLOR.a);
-		albedo *= mix(vec3(1.0), deform_tint, press_show);
+		// vertex dip underneath is soft at 1 m mesh resolution. The mound's
+		// churn tint rides the same ratio at its own strength.
+		vec3 marks = texture(deformation_map, deform_uv).rgb;
+		pressed = min(marks.r, 1.0);
+		raised = raise_of(marks.b);
+		float show = min(
+			pressed * deform_tint_strength + raised * deform_raise_tint, 1.0
+		) * sand_cap(COLOR.a);
+		albedo *= mix(vec3(1.0), deform_tint, show);
 	}
 	vec3 normal = normalize(cross(dFdy(VERTEX), dFdx(VERTEX)));
 	if (ripple_strength > 0.0) {
@@ -126,9 +157,11 @@ void fragment() {
 		float warp = sin(across * 0.15) * 0.8
 			+ (value_noise(world_xz * 0.07) - 0.5) * 1.6;
 		vec2 wave = ripple_wave((along + warp) / ripple_wavelength);
+		// Ripples die on pressed print floors and on freshly churned mounds
+		// alike — heaved sand has no wind-combed surface left.
 		float fade = smoothstep(ripple_alpha_fade_lo, ripple_alpha_fade_hi, COLOR.a)
 			* (1.0 - smoothstep(ripple_view_fade * 0.55, ripple_view_fade, length(VERTEX)))
-			* (1.0 - pressed);
+			* (1.0 - max(pressed, raised));
 		vec3 wind_view = mat3(VIEW_MATRIX) * vec3(wind.x, 0.0, wind.y);
 		normal = normalize(
 			normal - wind_view * (wave.y * ripple_strength / ripple_wavelength * fade)

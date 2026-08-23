@@ -225,8 +225,14 @@ func _wet_prints() -> void:
 	for _i: int in range(10):
 		await physics_frame
 
+	# Physics delta SCALES with Engine.time_scale (measured: ticks still come
+	# 60/s real, each worth time_scale/60 of sim time) — so 20 sim-seconds is
+	# 120 ticks here, not 1200. The original 1200-tick wait was 200 sim-s and
+	# only ever passed because the pre-6.8 _content_until overwrite froze the
+	# texture mid-fade (see DECISIONS 2026-08-22); the honest scheduler decays
+	# it to nothing in that long.
 	Engine.time_scale = 10.0
-	for _i: int in range(60 * 20):
+	for _i: int in range(120):
 		await physics_frame
 	Engine.time_scale = 1.0
 

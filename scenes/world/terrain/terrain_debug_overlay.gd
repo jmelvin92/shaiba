@@ -18,6 +18,15 @@ var _window_worst_ms: float = 0.0
 var _window_started_ms: int = 0
 var _shown_worst_ms: float = 0.0
 
+## The level's sand worm, if it has one (Phase 6.8) — the overlay pulls its
+## one-line status each update, the worm pushes nothing.
+var _worm: SandWorm = null
+
+
+## Called by the owning level's wiring (LevelRoot, down through ChunkManager).
+func set_worm(worm: SandWorm) -> void:
+	_worm = worm
+
 
 ## Called by the owning ChunkManager once per frame while visible.
 func update_stats(
@@ -42,3 +51,5 @@ func update_stats(
 	if _game != null:
 		_label.text += "\ntime %s   day %d   %s" % [
 			_game.clock_text(), _game.day_count, _game.period]
+	if _worm != null:
+		_label.text += "\n" + _worm.get_debug_text()

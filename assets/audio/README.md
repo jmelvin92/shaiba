@@ -91,6 +91,12 @@ exist. Sand works this way.
 |---|---|
 | `ambient_01..NN.ogg` | Quiet instrumental beds, seamless loops. `ambient_01` loops solo for now; when more land, they become a random rotation with silent gaps between tracks. |
 
+## creatures/ — the buried things (Phase 6.8)
+
+| Files | What it should sound like |
+|---|---|
+| `worm_rumble_loop.wav` | The sand worm passing underground: a deep, felt-more-than-heard rumble with slow grinding movement in it, seamless loop, mono. It plays from the worm's position — distance and doppler are the engine's job, so the file itself should be close-up and steady. |
+
 ## Later (do NOT source yet — listed so the plan stays in one place)
 
 Water wading steps + splashes (footsteps in the swash, entering/leaving the

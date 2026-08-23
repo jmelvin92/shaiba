@@ -125,6 +125,21 @@ Footprints can't be per-chunk geometry edits (too costly, breaks streaming). Ins
 
 `tools/verify_prints.gd` is the phase gate as an executable (run windowed): stamp↔bone alignment, off-trail cleanliness, landing splat, recentre survival, wind drift, decay-to-idle, pass cost.
 
+### Raised sand — the mound channel (added in Phase 6.8, Part 1)
+
+The deformation texture's **B channel heaves sand up** instead of pressing it down — the sand worm's traveling wake. `SandDeformation.raise()` mirrors `stamp()` exactly (same signal-and-connect contract, `SandWorm.raised` → `sand.raise` in the level), but the mark lives entirely in B with its own fast decay (`mound_settle_seconds`, ~1.4 s — a churned heap slumps in seconds, so the wake is a collapsing swell behind the worm, never a berm wall). Three rendering rules bought with visible failures, all in the shaders: raises use a **coreless brush** (a flat core saturates overlaps into a plateau the 1 m flat-shaded mesh draws as terraced cliffs); the terrain shader saturates B **softly** (`x/(1+x)`, never a hard clamp — same mesa problem); and lift only begins above a small **raise floor** (flat shading flips a whole facet's tone over centimetres, so a nearly-settled mound must release the surface completely). Prints are provably untouched: raise writes nothing into R/G, press writes nothing into B, and `verify_worm` plus the whole Phase 5 gate assert it.
+
+## The sand worm (as built in Phase 6.8, Part 1)
+
+`scenes/props/sand_worm/` — `SandWorm`, a bodiless underground agent in Part 1 (the rigged body is Part 2, the threat behaviour Part 3). It swims the analytic terrain, never physics: position integrates a heading at `swim_speed` with a turn-rate limit, Y follows `get_surface_height - swim_depth`, and travel-gated `raised` marks (the `min_step_distance` lesson, applied from day one) draw the mound.
+
+- **Steering is margin-based**: `_swim_margin(xz)` returns the tightest of three constraint margins (sand deeper than `min_swim_depth`, `shore_margin` from the waterline, clearance beyond the homestead pad + blend + `homestead_margin`), sand metres weighted ×10. Candidate headings around the desired one are probed at five points out to `lookahead`; the first with **comfortable** slack (≥ 2.0) wins, otherwise the max-margin arc — the worm climbs the margin gradient away from trouble instead of skimming the legal line, which is what keeps turn-arc overshoot from crossing it. Margins are sized to the turn radius (speed / turn rate, ~5.7 m): `lookahead` and `shore_margin` must stay comfortably above it.
+- **Dormant is free**: physics processing off until `summon()` (F7 in debug; F8 cycles WANDER/ORBIT/APPROACH), no stamps ⇒ the deformation system idles. Summon scans expanding rings (1×–4× `summon_distance`) because the player often stands where the worm may not go (the courtyard, the surf).
+- **Rumble is silent-safe** per 6.6: `creatures/worm_rumble_loop` through `SoundBank`, an `AudioStreamPlayer3D` created only when the file exists, distance attenuation doing the distance work.
+- **F3 shows a worm line** (state / distance / local sand depth): the overlay pulls `get_debug_text()`, wired down through `ChunkManager.get_debug_overlay()` by LevelRoot.
+
+`tools/verify_worm.gd` is the Part 1 gate as an executable (windowed): dormant zero-cost, the real F7 binding, raise marks landing in B and nothing but B, channel isolation both directions, a 180 sim-second wander with every guardrail asserted, settle-to-idle, pass cost. `tools/shoot_worm_ladder.gd` reproduces the size-ladder evidence (three scales, staged wake + posed placeholder breach, plus the live mound mid-orbit).
+
 ## Coast & ocean (as built in Phase 6.7)
 
 West of the desert the map becomes ocean. The whole biome is an extension of the analytic terrain model — no new world system, no second mesh pipeline:
