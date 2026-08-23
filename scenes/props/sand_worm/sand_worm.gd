@@ -29,6 +29,19 @@ const COMFORT_MARGIN: float = 2.0
 ## is what forces grazing escapes.
 const SUMMON_MARGIN: float = 3.0
 
+## --- Rig constants, mirrored from tools/build_worm.py (change one, change
+## both). The body model rests along +Z in Godot space: mouth rim at the
+## origin, spine bone k at z = SPINE_ARC[k], nose toward -Z. ---------------
+const SPINE_BONES: int = 16
+const HEAD_LEN: float = 1.6
+const RING_PITCH: float = 1.45
+const NOSE_LEN: float = 2.3
+const RIM_R: float = 1.55
+## Metres of path between stored samples; bones interpolate between them.
+const PATH_SAMPLE: float = 0.5
+## How far behind the head the path memory must reach (full body + slack).
+const PATH_MEMORY: float = 30.0
+
 ## Sand heaved up along the worm's path — same contract as FootstepStamper's
 ## `stamped`, but for the deformation system's raise channel.
 signal raised(
@@ -83,6 +96,16 @@ enum Mode { WANDER, ORBIT, APPROACH }
 ## Elongation of each mark along the direction of travel.
 @export_range(1.0, 3.0, 0.05) var mound_stretch: float = 1.5
 
+@export_group("Breach")
+## Metres of travel the breach arc spans, entry crossing to exit crossing.
+@export_range(15.0, 80.0, 1.0) var breach_length: float = 36.0
+## Peak height of the head above the surface at the top of the arc, metres.
+@export_range(1.0, 15.0, 0.5) var breach_apex: float = 6.5
+## Speed multiplier while breaching — the lunge.
+@export_range(1.0, 2.0, 0.05) var breach_surge: float = 1.35
+## Fully open mouth-lip angle, degrees (hinged at the rim).
+@export_range(10.0, 110.0, 1.0) var lip_open_degrees: float = 75.0
+
 @export_group("Debug behaviours")
 ## Circling distance for ORBIT, metres.
 @export_range(4.0, 40.0, 0.5) var orbit_radius: float = 12.0
@@ -93,7 +116,11 @@ enum Mode { WANDER, ORBIT, APPROACH }
 ## Joshua's sourcing list; until it lands there is no emitter at all.
 @export_range(20.0, 200.0, 5.0) var rumble_distance: float = 80.0
 
+## Count of sand bursts fired (breach crossings), for verify tooling.
+var bursts_fired: int = 0
+
 var _rumble: AudioStreamPlayer3D = null
+var _breach_sound: AudioStream = null
 var _terrain: TerrainSettings = null
 var _focus: Node3D = null
 var _mode: Mode = Mode.WANDER
@@ -104,6 +131,27 @@ var _heading: float = 0.0
 var _odometer: float = 0.0
 var _since_mark: float = 0.0
 var _drift: FastNoiseLite = null
+
+## The rigged body (Part 2): skeleton driven bone-by-bone along the path.
+var _skeleton: Skeleton3D = null
+## Rest pose of every bone in skeleton space, captured once — the B in
+## pose = skeleton⁻¹ · world-mapping · B.
+var _rest: Array[Transform3D] = []
+## Arc distance behind the head where each spine bone rides.
+var _spine_arc: PackedFloat64Array = PackedFloat64Array()
+## Path memory: world positions the head has occupied, one sample per
+## PATH_SAMPLE metres of travel, oldest first, with the odometer reading at
+## each sample. Bones interpolate between samples.
+var _samples: PackedVector3Array = PackedVector3Array()
+var _sample_arcs: PackedFloat64Array = PackedFloat64Array()
+## Breach state: negative when swimming level, else metres travelled into
+## the arc. The head's height rides the arc; the body follows through the
+## path memory for free.
+var _breach_at: float = -1.0
+## Sign of (head height - surface) last tick, for crossing detection.
+var _was_above: bool = false
+var _mouth_open: float = 0.0
+var _burst: GPUParticles3D = null
 
 
 func _ready() -> void:
@@ -124,6 +172,64 @@ func _ready() -> void:
 		# Doppler on: a low rumble sweeping past is half the dread.
 		_rumble.doppler_tracking = AudioStreamPlayer3D.DOPPLER_TRACKING_PHYSICS_STEP
 		add_child(_rumble)
+	_breach_sound = SoundBank.stream("creatures/worm_breach_01")
+	_setup_body()
+	_setup_burst()
+
+
+## Find the rigged body (Part 2). Everything stays null-safe: a scene without
+## the Body child (or a rebuilt glb missing bones) degrades to the Part 1
+## bodiless agent instead of erroring.
+func _setup_body() -> void:
+	var body: Node = get_node_or_null(^"Body")
+	if body == null:
+		return
+	var skeletons: Array[Node] = body.find_children("*", "Skeleton3D", true, false)
+	if skeletons.is_empty():
+		return
+	_skeleton = skeletons[0] as Skeleton3D
+	_spine_arc.clear()
+	for k: int in range(SPINE_BONES):
+		_spine_arc.append(0.0 if k == 0 else HEAD_LEN + float(k - 1) * RING_PITCH)
+	_rest.clear()
+	_rest.resize(_skeleton.get_bone_count())
+	for k: int in range(_skeleton.get_bone_count()):
+		_rest[k] = _skeleton.get_bone_global_rest(k)
+	# The skeleton's bones sweep up to a body length from the node; without a
+	# generous AABB the mesh pops out of view whenever the node's own origin
+	# leaves the frustum.
+	for instance: Node in body.find_children("*", "MeshInstance3D", true, false):
+		(instance as MeshInstance3D).custom_aabb = AABB(
+			Vector3(-32.0, -32.0, -32.0), Vector3(64.0, 64.0, 64.0)
+		)
+
+
+## The sand thrown at a breach crossing: a one-shot burst of palette sand
+## chunks, built in code so the scene stays a plain wrapper.
+func _setup_burst() -> void:
+	_burst = GPUParticles3D.new()
+	_burst.emitting = false
+	_burst.one_shot = true
+	_burst.amount = 130
+	_burst.lifetime = 1.1
+	_burst.explosiveness = 1.0
+	_burst.top_level = true
+	var process: ParticleProcessMaterial = ParticleProcessMaterial.new()
+	process.direction = Vector3(0.0, 1.0, 0.0)
+	process.spread = 50.0
+	process.initial_velocity_min = 4.0
+	process.initial_velocity_max = 10.0
+	process.gravity = Vector3(0.0, -18.0, 0.0)
+	process.scale_min = 0.4
+	process.scale_max = 1.0
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	process.emission_sphere_radius = 2.4
+	_burst.process_material = process
+	var grain: BoxMesh = BoxMesh.new()
+	grain.size = Vector3(0.2, 0.2, 0.2)
+	grain.material = load("res://resources/palette/sand_mid.tres")
+	_burst.draw_pass_1 = grain
+	add_child(_burst)
 
 
 ## Called by the owning level once terrain exists. Without terrain the worm
@@ -162,18 +268,76 @@ func summon(mode: Mode = Mode.WANDER) -> bool:
 			var at: Vector2 = centre + direction * (summon_distance * ring)
 			if _swim_margin(at) < SUMMON_MARGIN:
 				continue
-			_mode = mode
-			global_position = Vector3(
-				at.x, _terrain.get_surface_height(at) - swim_depth, at.y
-			)
 			# Start tangent to the player, not head-on: every mode opens
 			# with the mound sweeping past rather than a beeline.
-			_heading = direction.angle() + PI * 0.5
-			_odometer = 0.0
-			_since_mark = 0.0
-			_set_active(true)
+			summon_at(at, direction.angle() + PI * 0.5, mode)
 			return true
 	return false
+
+
+## Place the worm exactly: position, heading, mode. The staging entry point —
+## shoot tooling today, Part 3's encounter director tomorrow. Does not check
+## swimmability; the caller chooses the spot.
+func summon_at(at: Vector2, heading: float, mode: Mode = Mode.WANDER) -> bool:
+	if _terrain == null:
+		return false
+	_mode = mode
+	global_position = Vector3(
+		at.x, _terrain.get_surface_height(at) - swim_depth, at.y
+	)
+	_heading = heading
+	_odometer = 0.0
+	_since_mark = 0.0
+	_breach_at = -1.0
+	_mouth_open = 0.0
+	_was_above = false
+	_prefill_path()
+	_set_active(true)
+	return true
+
+
+## Seed the path memory with a straight run behind the spawn point, so the
+## body lies stretched along the sand from its first frame instead of
+## collapsing to a point and unfolding.
+func _prefill_path() -> void:
+	_samples.clear()
+	_sample_arcs.clear()
+	var back: Vector2 = -Vector2.from_angle(_heading)
+	var arc: float = PATH_MEMORY
+	while arc >= PATH_SAMPLE:
+		var at: Vector2 = _xz() + back * arc
+		_samples.append(Vector3(
+			at.x, _terrain.get_surface_height(at) - swim_depth, at.y
+		))
+		_sample_arcs.append(-arc)
+		arc -= PATH_SAMPLE
+
+
+## Start the breach arc: the head lunges up through the surface and back
+## under over [member breach_length] metres of travel; the body follows the
+## same gate through the path memory. A no-op while dormant or mid-breach.
+func breach() -> void:
+	if _active and _breach_at < 0.0:
+		_breach_at = 0.0
+
+
+func is_breaching() -> bool:
+	return _breach_at >= 0.0
+
+
+## 0–1 through the breach arc, -1 while swimming level. For shoot tooling.
+func get_breach_progress() -> float:
+	return -1.0 if _breach_at < 0.0 else _breach_at / breach_length
+
+
+## 0 closed to 1 fully open — rises as the head clears the sand.
+func get_mouth_open() -> float:
+	return _mouth_open
+
+
+## The rigged body's skeleton, for verify tooling. Null on a body-less scene.
+func get_skeleton() -> Skeleton3D:
+	return _skeleton
 
 
 func dismiss() -> void:
@@ -200,10 +364,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			summon(_mode)
 	elif event.is_action_pressed("debug_worm_mode"):
 		_mode = ((int(_mode) + 1) % Mode.size()) as Mode
+	elif event.is_action_pressed("debug_worm_breach"):
+		breach()
 
 
 func _set_active(on: bool) -> void:
 	_active = on
+	# The body exists only while the worm does — dormant means invisible,
+	# not merely still. (Cost a phantom-empty breach shoot: the driven
+	# skeleton was verifying perfectly inside a hidden node.)
+	visible = on
 	set_physics_process(on)
 	if _rumble != null:
 		if on:
@@ -213,28 +383,182 @@ func _set_active(on: bool) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	var desired: float = _desired_heading()
-	_heading = rotate_toward(
-		_heading, _steer(desired), deg_to_rad(turn_rate_degrees) * delta
-	)
+	var breaching: bool = _breach_at >= 0.0
+	if not breaching:
+		# A breach is a committed lunge: steering pauses so the arc stays
+		# clean, and resumes the moment the head is back under.
+		var desired: float = _desired_heading()
+		_heading = rotate_toward(
+			_heading, _steer(desired), deg_to_rad(turn_rate_degrees) * delta
+		)
 
-	var step: float = swim_speed * delta
+	var step: float = swim_speed * (breach_surge if breaching else 1.0) * delta
 	var direction: Vector2 = Vector2.from_angle(_heading)
 	global_position.x += direction.x * step
 	global_position.z += direction.y * step
 	_odometer += step
 
-	# The body rides under the surface it is displacing; smooth the follow so
-	# dune slopes never pop the (future) body or the rumble emitter.
 	var surface: float = _terrain.get_surface_height(_xz())
-	global_position.y = lerpf(
-		global_position.y, surface - swim_depth, 1.0 - exp(-4.0 * delta)
-	)
+	if breaching:
+		_breach_at += step
+		if _breach_at >= breach_length:
+			_breach_at = -1.0
+			global_position.y = surface - swim_depth
+		else:
+			# A bell over the run: -swim_depth at both crossings, apex at the
+			# top. The head's height IS the animation; the body inherits it
+			# through the path memory.
+			var bell: float = pow(
+				sin(PI * _breach_at / breach_length), 1.3
+			)
+			global_position.y = surface + lerpf(-swim_depth, breach_apex, bell)
+	else:
+		# The body rides under the surface it is displacing; smooth the
+		# follow so dune slopes never pop the body or the rumble emitter.
+		global_position.y = lerpf(
+			global_position.y, surface - swim_depth, 1.0 - exp(-4.0 * delta)
+		)
+
+	# The mouth opens as the head clears the sand and closes as it dives.
+	var above: float = global_position.y - surface
+	_mouth_open = clampf(above / maxf(breach_apex * 0.5, 0.1), 0.0, 1.0)
+	var now_above: bool = above > 0.0
+	if now_above != _was_above:
+		_fire_burst()
+	_was_above = now_above
+
+	_record_sample()
+	_drive_bones()
 
 	_since_mark += step
 	while _since_mark >= mound_spacing:
 		_since_mark -= mound_spacing
-		raised.emit(_xz(), mound_radius, mound_strength, _heading, mound_stretch)
+		# An airborne head displaces no sand — the wake pauses over the arc;
+		# the crossing bursts own those two moments instead.
+		if not now_above:
+			raised.emit(_xz(), mound_radius, mound_strength, _heading, mound_stretch)
+
+
+## Sand explodes where the body crosses the surface, both directions.
+func _fire_burst() -> void:
+	bursts_fired += 1
+	var at: Vector2 = _xz()
+	var ground: float = _terrain.get_surface_height(at)
+	if _burst != null:
+		_burst.global_position = Vector3(at.x, ground + 0.6, at.y)
+		_burst.restart()
+	# The crossing heaves a wide ring of sand beyond the ordinary wake.
+	raised.emit(at, mound_radius * 1.7, 1.0, _heading, 1.0)
+	if _breach_sound != null:
+		var boom: AudioStreamPlayer3D = AudioStreamPlayer3D.new()
+		boom.stream = _breach_sound
+		boom.bus = &"SFX"
+		boom.max_distance = rumble_distance * 1.5
+		boom.finished.connect(boom.queue_free)
+		add_child(boom)
+		boom.global_position = Vector3(at.x, ground, at.y)
+		boom.play()
+
+
+## Append a path sample once the head has travelled PATH_SAMPLE since the
+## last one, and forget samples the tail can no longer reach.
+func _record_sample() -> void:
+	if (
+		_sample_arcs.is_empty()
+		or _odometer - _sample_arcs[_sample_arcs.size() - 1] >= PATH_SAMPLE
+	):
+		_samples.append(global_position)
+		_sample_arcs.append(_odometer)
+	while _sample_arcs.size() > 2 and _odometer - _sample_arcs[0] > PATH_MEMORY:
+		_samples.remove_at(0)
+		_sample_arcs.remove_at(0)
+
+
+## World position of the path at an arc distance behind the head, by linear
+## interpolation between stored samples.
+func _path_point(arc_behind: float) -> Vector3:
+	var target: float = _odometer - arc_behind
+	if _sample_arcs.is_empty() or target >= _odometer:
+		return global_position
+	var last: int = _sample_arcs.size() - 1
+	if target >= _sample_arcs[last]:
+		# Between the newest stored sample and the live head.
+		var head_span: float = _odometer - _sample_arcs[last]
+		var head_t: float = (
+			0.0 if head_span <= 0.0 else (target - _sample_arcs[last]) / head_span
+		)
+		return _samples[last].lerp(global_position, head_t)
+	var i: int = last
+	while i > 0 and _sample_arcs[i - 1] > target:
+		i -= 1
+	if i == 0:
+		return _samples[0]
+	var span: float = _sample_arcs[i] - _sample_arcs[i - 1]
+	var t: float = 0.0 if span <= 0.0 else (target - _sample_arcs[i - 1]) / span
+	return _samples[i - 1].lerp(_samples[i], t)
+
+
+## Pose every bone along the path: bone k sits its rest arc behind the head,
+## facing along the path's tangent. pose = skeleton⁻¹ · M · rest, where M
+## maps the rest spine axis (+Z, nose -Z) onto the path.
+func _drive_bones() -> void:
+	if _skeleton == null:
+		return
+	var to_skeleton: Transform3D = _skeleton.global_transform.affine_inverse()
+	var poses: Array[Transform3D] = []
+	poses.resize(SPINE_BONES)
+	for k: int in range(SPINE_BONES):
+		var arc: float = _spine_arc[k]
+		var at: Vector3 = global_position if k == 0 else _path_point(arc)
+		var ahead: Vector3 = (
+			global_position if k == 0 else _path_point(maxf(arc - 1.0, 0.0))
+		)
+		var behind: Vector3 = _path_point(arc + 1.0)
+		var forward: Vector3 = ahead - behind
+		if forward.length_squared() < 0.0001:
+			forward = Vector3(
+				cos(_heading + PI * 0.5), 0.0, sin(_heading + PI * 0.5)
+			)
+		forward = forward.normalized()
+		# Rest nose points -Z, so the basis' +Z is the tailward axis.
+		var up_ref: Vector3 = (
+			Vector3.UP if absf(forward.dot(Vector3.UP)) < 0.95 else Vector3.RIGHT
+		)
+		var z_axis: Vector3 = -forward
+		var x_axis: Vector3 = up_ref.cross(z_axis).normalized()
+		var y_axis: Vector3 = z_axis.cross(x_axis)
+		var rotation: Basis = Basis(x_axis, y_axis, z_axis)
+		var mapping: Transform3D = Transform3D(
+			rotation, at - rotation * Vector3(0.0, 0.0, arc)
+		)
+		poses[k] = mapping
+		var bone: int = _skeleton.find_bone("spine_%02d" % k)
+		if bone >= 0:
+			_skeleton.set_bone_global_pose(
+				bone, to_skeleton * mapping * _rest[bone]
+			)
+	# Lips hinge on the mouth rim, swinging outward with _mouth_open. The
+	# hinge points/axes mirror tools/build_worm.py's lip_hinge().
+	var open_angle: float = deg_to_rad(lip_open_degrees) * _mouth_open
+	for lip: int in range(3):
+		var bone: int = _skeleton.find_bone("lip_%d" % lip)
+		if bone < 0:
+			continue
+		var angle: float = TAU * float(lip) / 3.0 + PI * 0.5
+		# Blender rim circle (XZ) lands in Godot's XY plane: x stays x,
+		# Blender z becomes Godot y.
+		var hinge_point: Vector3 = Vector3(
+			cos(angle) * RIM_R, sin(angle) * RIM_R, 0.0
+		)
+		var hinge_axis: Vector3 = Vector3(-sin(angle), cos(angle), 0.0)
+		var swing: Transform3D = (
+			Transform3D(Basis.IDENTITY, hinge_point)
+			* Transform3D(Basis(hinge_axis, -open_angle), Vector3.ZERO)
+			* Transform3D(Basis.IDENTITY, -hinge_point)
+		)
+		_skeleton.set_bone_global_pose(
+			bone, to_skeleton * poses[0] * swing * _rest[bone]
+		)
 
 
 ## Where the current behaviour wants to go, before the sand has its say.

@@ -1,6 +1,9 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scenes/props/sand_worm/sand_worm.gd" id="1_worm"]
+[ext_resource type="PackedScene" path="res://assets/models/worm.glb" id="2_body"]
 
 [node name="SandWorm" type="Node3D"]
 script = ExtResource("1_worm")
+
+[node name="Body" parent="." instance=ExtResource("2_body")]

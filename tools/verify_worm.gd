@@ -80,6 +80,8 @@ func _run() -> void:
 	await _check_dormant(sand, worm)
 	await _check_summon_via_input(worm)
 	await _check_marks_land(sand, worm)
+	await _check_body_follows(worm, terrain)
+	await _check_breach(worm, terrain)
 	await _check_channel_isolation(sand, worm)
 	await _check_guardrails(worm, terrain)
 	await _check_settle_and_idle(sand, worm)
@@ -191,6 +193,105 @@ func _check_marks_land(sand: SandDeformation, worm: SandWorm) -> void:
 	_check(
 		stray < 0.005, "sand off the path stays unmounded",
 		"B = %.3f at %s" % [stray, aside]
+	)
+
+
+## World position of a named bone, from the driven skeleton.
+func _bone_world(skeleton: Skeleton3D, bone_name: String) -> Vector3:
+	var bone: int = skeleton.find_bone(bone_name)
+	return (
+		skeleton.global_transform * skeleton.get_bone_global_pose(bone).origin
+	)
+
+
+## Part 2: the rigged body must trail the head along the path — bones spaced
+## like the rig contract says, every one of them under the sand while the
+## worm swims level.
+func _check_body_follows(worm: SandWorm, terrain: TerrainSettings) -> void:
+	var skeleton: Skeleton3D = worm.get_skeleton()
+	_check(skeleton != null, "the rigged body is found and driven")
+	if skeleton == null:
+		return
+	# Let the orbit put real curvature into the path first.
+	for _i: int in range(60 * 3):
+		await physics_frame
+	var worst_spacing_error: float = 0.0
+	var worst_above: float = -INF
+	for k: int in range(16):
+		var at: Vector3 = _bone_world(skeleton, "spine_%02d" % k)
+		if k > 0:
+			var previous: Vector3 = _bone_world(skeleton, "spine_%02d" % (k - 1))
+			var expected: float = 1.6 if k == 1 else 1.45
+			worst_spacing_error = maxf(
+				worst_spacing_error,
+				absf(at.distance_to(previous) - expected) / expected
+			)
+		var ground: float = terrain.get_surface_height(Vector2(at.x, at.z))
+		worst_above = maxf(worst_above, at.y - ground)
+	_check(
+		worst_spacing_error < 0.25,
+		"spine bones hold the rig's segment spacing along the path",
+		"worst error %.0f%%" % (worst_spacing_error * 100.0)
+	)
+	_check(
+		worst_above < 0.5, "the whole body swims under the sand",
+		"a bone reached %.2f m above the surface" % worst_above
+	)
+	_check(
+		_bone_world(skeleton, "spine_00").distance_to(worm.global_position) < 0.2,
+		"the head bone rides the agent's position"
+	)
+
+
+## Part 2: a breach (via the real F9 binding) sends the head above the
+## surface with the mouth opening, throws sand at both crossings, and ends
+## back in clean level swimming.
+func _check_breach(worm: SandWorm, terrain: TerrainSettings) -> void:
+	var skeleton: Skeleton3D = worm.get_skeleton()
+	if skeleton == null:
+		return
+	var bursts_before: int = worm.bursts_fired
+	var press: InputEventKey = InputEventKey.new()
+	press.physical_keycode = KEY_F9
+	press.pressed = true
+	Input.parse_input_event(press)
+	await physics_frame
+	await physics_frame
+	_check(worm.is_breaching(), "F9 starts a breach (real InputMap binding)")
+	var peak: float = -INF
+	var mouth_peak: float = 0.0
+	var guard: int = 0
+	while worm.is_breaching() and guard < 60 * 20:
+		guard += 1
+		await physics_frame
+		var head: Vector3 = _bone_world(skeleton, "spine_00")
+		peak = maxf(
+			peak,
+			head.y - terrain.get_surface_height(Vector2(head.x, head.z))
+		)
+		mouth_peak = maxf(mouth_peak, worm.get_mouth_open())
+	_check(not worm.is_breaching(), "the breach ends on its own")
+	_check(
+		peak > worm.breach_apex * 0.5, "the head clears the surface",
+		"peak %.1f m vs apex %.1f m" % [peak, worm.breach_apex]
+	)
+	_check(
+		mouth_peak > 0.5, "the mouth opens at the top of the arc",
+		"opened %.2f" % mouth_peak
+	)
+	_check(
+		worm.bursts_fired - bursts_before >= 2,
+		"sand bursts at the exit and entry crossings",
+		"%d bursts" % (worm.bursts_fired - bursts_before)
+	)
+	for _i: int in range(60):
+		await physics_frame
+	var head_after: Vector3 = _bone_world(skeleton, "spine_00")
+	var ground_after: float = terrain.get_surface_height(
+		Vector2(head_after.x, head_after.z)
+	)
+	_check(
+		head_after.y < ground_after, "the head is back under the sand after"
 	)
 
 

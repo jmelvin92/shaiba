@@ -20,7 +20,7 @@ This file is the **single source of truth for project progress**. Every Claude C
 | 6.5 | Game clock, day-night cycle & lighting (side-track) | `feature/daynight-lighting` | 🟡 In progress — clock ✅; cycle ✅; lighting built & verified 2026-08-15 (lamp, torch, flames, real windows), awaiting flicker playtest |
 | 6.6 | Audio system (side-track) | `feature/audio-system` | 🟡 Engine done; first sound batch in & mix approved by ear 2026-08-15 (sand steps, doors, wind, music); pause menu (Esc) + settings audio sliders + UI sounds in 2026-08-15. Remaining: fire/landing/shuffle/indoor sounds, then final listen-through |
 | 6.7 | Ocean biome — the western sea | `feature/ocean-biome` | 🟡 Part 1 ✅ **signed off by Joshua 2026-08-22** ("water test is good") — hard gate lifted, branch pushed to GitHub. Water keeps its palette-only defaults. Only the merge to `development` remains, blocked on the 6.5 → 6.6 chain. Ocean grows later per roadmap: depth/swimming, sound FX, submarine & vehicle mechanics |
-| 6.8 | The sand worm — desert mob | `feature/sand-worm` | 🟡 Part 1 ✅ (titan picked, swallow-whole kill); **Part 2 in progress 2026-08-22** — hand-built model from Joshua's reference (no Meshy), procedural spine, breach spectacle. Merges after 6.7 |
+| 6.8 | The sand worm — desert mob | `feature/sand-worm` | 🟡 Parts 1–2 built & verified 2026-08-22 — titan body (hand-built), procedural spine, F9 breach with bursts, all gates green. **Awaiting Joshua: breach look/feel + body palette.** Part 3 (threat) needs its planning talk. Merges after 6.7 |
 | 7 | Integration & polish → v0.1 | `feature/phase-7-polish` | 🔲 Not started |
 
 Status legend: 🔲 Not started · 🟡 In progress · 🧪 In testing on `development` · ✅ Done (merged, gate passed)
@@ -493,12 +493,16 @@ Everything measurable is green; the one open item is **Joshua's scale pick** fro
 - **`tools/shoot_worm.gd`**: the breach at the gameplay camera (approach, apex, re-entry) + a body-palette ladder if the first read disappoints — evidence committed to `docs/references/`.
 
 **Part 2 exit bar**
-- [ ] `build_worm.py` rebuilds `.blend` + `.glb` headless in one command; tris ≤ 6,000; palette-only materials; dimensions audit prints 26 × 3.4 m.
-- [ ] `verify_worm` (grown) passes; `verify_prints`, ocean `--wetprints`, and the full battery stay green.
-- [ ] The breach reads at the gameplay camera: body arcs out of and back into the dune where the wake was traveling, sand bursts at both crossings, no visible seam between body and sand at the waterlines of the arc.
-- [ ] Perf: no measurable regression with the body on screen and a breach mid-flight.
-- [ ] Joshua has seen the breach (screenshots or live) and approves the body's look — palette mapping laddered if he wants alternatives.
-- [ ] Zero warnings; PLAN/DECISIONS/ART_DIRECTION updated; committed.
+- [x] `build_worm.py` rebuilds `.blend` + `.glb` headless in one command; tris ≤ 6,000; palette-only materials; dimensions audit prints 26 × 3.4 m. *(1,926 tris; plaster/clay/sand_shadow/night_blue only; the script asserts the 26 m contract at build time.)*
+- [x] `verify_worm` (grown) passes; `verify_prints`, ocean `--wetprints`, and the battery stay green. *(All 32 verify_worm checks green 2026-08-22 — body found and driven, spine spacing held along the path, whole body under the sand while swimming, F9 breach through the real binding with mouth opening and both crossing bursts; prints, wetprints and clock re-run green.)*
+- [x] The breach reads at the gameplay camera: body arcs out of and back into the dune where the wake was traveling, sand bursts at both crossings. *(`docs/references/worm_breach_{rise,apex,dive,after}.png` — the rise with particles flying, the full arc with its shadow, the dive, the tail sliding under.)*
+- [x] Perf: no measurable regression with the body on screen and a breach mid-flight. *(103–120 fps across the captured sequence at the gameplay camera.)*
+- [ ] **Joshua has seen the breach (screenshots or live) and approves the body's look** — palette mapping laddered if he wants alternatives. **← the open item.**
+- [x] Zero warnings; PLAN/DECISIONS/ARCHITECTURE updated; committed. *(`--import`, per-script checks, world/graybox/standalone runs all clean.)*
+
+**Handoff notes (2026-08-22, end of the Part 2 build session)**
+
+The titan is real: F7 summons it, F9 makes it breach (F8 still cycles wander/orbit/approach). The body is `tools/build_worm.py` (hand-built, no Meshy — Joshua's call, from his reference photo committed as `docs/references/worm_reference.png`); the breach falls out of path-following (the head's path lifts, the body follows), so it works at any angle mid-orbit. Everything tunable is an export: breach length/apex/surge and lip opening on `SandWorm`, the body's look in the build script. The mouth's swallow bones exist and open — Part 3 animates the kill on them. Body has no collision yet (spectacle, not threat). Two audio rows await sourcing (`worm_rumble_loop`, `worm_breach_01`). What remains is Joshua's eye: the body's palette read (pale plaster plates against the orange — his reference's cream, but a ladder is one ask away) and the breach feel live.
 
 ### Part 3 — The threat (its own planning session first)
 Noise attraction via `noise_made` (footstep loudness already varies by gait — running calls it, sneaking doesn't); a rarity/encounter director (incredibly rare, tunable — never a spawn timer the player can feel); stalk → mound-approach → strike behavior; **the kill: the worm swallows the player whole** (Joshua's call, 2026-08-22 — made with the titan pick, and exactly what a 26 m body is for); what death *means* (reload-last-save vs. a health layer) stays the deferred call this part's planning session resolves; the safe-ground rule surfaced to Joshua as a design opportunity. Feel items (fear pacing, fairness of the noise rule, rarity) gate on his playtests, as ever.
