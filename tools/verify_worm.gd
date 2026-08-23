@@ -479,8 +479,11 @@ func _check_hunt_cycle(
 	if not worm.is_hunting():
 		return
 	_check(
-		events >= 100, "waking takes sustained noise, not a stray step",
-		"woke after only %d events" % events
+		events >= int(director.attraction_threshold * 0.9),
+		"waking takes sustained noise, not a stray step",
+		"woke after only %d events against a threshold of %.0f" % [
+			events, director.attraction_threshold
+		]
 	)
 	_check(
 		worm.get_hunt_state() == SandWorm.HuntState.SEEK,

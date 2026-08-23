@@ -20,11 +20,15 @@ extends Node
 ## worm behaviour — it wakes the worm ([method SandWorm.hunt]) and forwards
 ## fresh noise to it ([method SandWorm.hear]); the hunt itself is the worm's.
 
-## Accumulated loudness at which the worm wakes. With the default gains a
-## couple of minutes of sustained running on deep sand crests it; walking
-## takes many times longer; crouching never will (crouched feet make no
-## noise at all).
-@export_range(20.0, 2000.0, 5.0) var attraction_threshold: float = 300.0
+## Accumulated loudness at which the worm wakes. Walking takes several
+## times longer than running; crouching never wakes it (crouched feet make
+## no noise at all).
+##
+## PLAYTEST VALUE (2026-08-23, Joshua's ask): 60 ≈ 25 s of sustained
+## running — easy to trigger while the hunt is being tuned. The shipping
+## rarity ("incredibly rare") wants this back up around 300+ once the feel
+## locks; the encounter should be something a quiet player may never see.
+@export_range(20.0, 2000.0, 5.0) var attraction_threshold: float = 60.0
 ## Meter units added per unit of noise loudness.
 @export_range(0.1, 10.0, 0.1) var noise_gain: float = 1.0
 ## Meter units drained per second of quiet — patience erases attention.
@@ -34,7 +38,9 @@ extends Node
 ## it cannot swim through is also ground it cannot listen through.
 @export_range(0.05, 2.0, 0.05) var min_carry_depth: float = 0.5
 ## Quiet window after a hunt ends before the meter may build again, seconds.
-@export_range(0.0, 1800.0, 5.0) var calm_seconds: float = 240.0
+## PLAYTEST VALUE (2026-08-23): 45 so encounters can chain while tuning;
+## shipping rarity wants minutes here (the plan's original 240).
+@export_range(0.0, 1800.0, 5.0) var calm_seconds: float = 45.0
 
 var _worm: SandWorm = null
 var _terrain: TerrainSettings = null
